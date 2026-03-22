@@ -14,3 +14,7 @@ spec:
     name: flux-system    # References the GitRepository created by bootstrap
   path: ./pi-zoro/apps/staging   # Flux will now also watch this path
   prune: true            # Delete resources that are removed from Git
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

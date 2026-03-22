@@ -1,0 +1,5 @@
+# Age private key - 
+age.agekey
+
+# Raw unencrypted secrets
+test-secret.yaml

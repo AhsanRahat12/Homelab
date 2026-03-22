@@ -4,3 +4,4 @@ namespace: linkding
 resources:
   - ../../base/linkding/    # hops up two directories: staging/linkding → staging → apps → base/linkding
   - cloudflare.yaml
+  - cloudflare-secret.yaml
