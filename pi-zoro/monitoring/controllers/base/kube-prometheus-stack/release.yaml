@@ -28,4 +28,4 @@ spec:
           kind: PrometheusRule
   values:
     grafana:
-      adminPassword: mischa       # Equivalent to a values.yaml override
+      adminPassword: rahat       # Equivalent to a values.yaml override
