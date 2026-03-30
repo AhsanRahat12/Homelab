@@ -28,4 +28,15 @@ spec:
           kind: PrometheusRule
   values:
     grafana:
-      adminPassword: rahat       # Equivalent to a values.yaml override
+      adminPassword: rahat
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+
+        hosts:
+          - grs.rahatahsan.com
+
+        tls:
+          - secretName: grafana-tls-secret
+            hosts:
+              - grs.rahatahsan.com
