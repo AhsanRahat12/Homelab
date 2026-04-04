@@ -1,4 +1,4 @@
-# Homelab
+# 🏠 Homelab
 
 Self-hosted infrastructure running on a Raspberry Pi 5, managed with Flux for GitOps continuous deployment.
 
@@ -10,7 +10,7 @@ Everything is defined as code, version controlled, and applied declaratively. No
 
 ---
 
-## Hardware
+## 🖥️ Hardware
 
 | Node | Hardware | Role |
 |---|---|---|
@@ -22,7 +22,7 @@ Everything is defined as code, version controlled, and applied declaratively. No
 
 ---
 
-## Stack
+## 🧰 Stack
 
 | Tool | Purpose |
 |---|---|
@@ -39,14 +39,16 @@ Everything is defined as code, version controlled, and applied declaratively. No
 
 ---
 
-## Repository Structure
+## 📁 Repository Structure
 
 ```
 Homelab/
 ├── renovate.json
+├── README.md
 └── pi-zoro/
     ├── apps/
     ├── clusters/
+    ├── docs/
     ├── infrastructure/
     └── monitoring/
 ```
@@ -55,17 +57,17 @@ Flux watches the `clusters/staging/` directory and follows the chain of Kustomiz
 
 ---
 
-## Projects
+## 🚀 Projects
 
-### Linkding
-Self-hosted bookmark manager running on `pi-zoro`. Accessible externally via Cloudflare Tunnel at `links.rahatahsan.com`.
+### 🔖 [Linkding](./pi-zoro/docs/linkding/README.md)
+Self-hosted bookmark manager running on `pi-zoro`. Accessible externally via Cloudflare Tunnel at `links.rahatahsan.com`. Covers persistent storage, non-root security context, SOPS-encrypted secrets, and dual access patterns via Cloudflare Tunnel and Traefik Ingress.
 
-### Audiobookshelf
+### 🎧 Audiobookshelf
 Self-hosted audiobook server *(coming soon)*
 
 ---
 
-## Infrastructure & Monitoring
+## 📊 Infrastructure & Monitoring
 
 **Monitoring:** Full observability stack via kube-prometheus-stack — Prometheus for metrics collection and Grafana for visualisation, accessible privately at `grs.rahatahsan.com`.
 
