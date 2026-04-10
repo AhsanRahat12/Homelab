@@ -4,3 +4,5 @@ namespace: audiobookshelf-staging-ns
 resources:
   - ../../base/audiobookshelf
   - audiobookshelf-staging-ns.yaml
+  - cloudflare-audiobookshelf.yaml
+  - tunnel-credentials-audiobookshelf.yaml
