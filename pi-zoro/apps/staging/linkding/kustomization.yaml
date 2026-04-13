@@ -5,3 +5,5 @@ resources:
   - ../../base/linkding/    # hops up two directories: staging/linkding → staging → apps → base/linkding
   - namespace.yaml
   - linkding-container-env-secret.yaml
+patches:
+  - path: patch-pvc.yaml
