@@ -13,6 +13,7 @@ spec:
     driver: org.democratic-csi.node-manual
     volumeHandle: linkding-data
     volumeAttributes:
+      provisioner_driver: node-manual
       node_attach_driver: iscsi
       portal: 192.168.1.153:3260
       iqn: iqn.2004-04.com.qnap:ts-464:iscsi.target-0.88196c
