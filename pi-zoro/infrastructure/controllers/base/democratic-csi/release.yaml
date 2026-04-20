@@ -51,3 +51,5 @@ spec:
     driver:
       config:
         driver: node-manual
+        node:
+          driver: iscsi
