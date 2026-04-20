@@ -5,7 +5,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: ""
+  storageClassName: qnap-iscsi-manual
   volumeName: linkding-data-pv
   resources:
     requests:

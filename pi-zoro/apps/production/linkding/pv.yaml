@@ -8,14 +8,15 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: ""
-  local:
-    path: /mnt/linkding-data
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: kubernetes.io/hostname
-              operator: In
-              values:
-                - zoro
+  storageClassName: qnap-iscsi-manual
+  csi:
+    driver: org.democratic-csi.node-manual
+    volumeHandle: linkding-data
+    volumeAttributes:
+      portal: 192.168.1.153:3260
+      iqn: iqn.2004-04.com.qnap:ts-464:iscsi.target-0.88196c
+      lun: "0"
+      targetPortal: 192.168.1.153:3260
+    nodeStageSecretRef:
+      name: democratic-csi-iscsi-chap
+      namespace: democratic-csi
