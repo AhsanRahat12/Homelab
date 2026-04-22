@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: config-pvc
+spec:
+  storageClassName: qnap-iscsi-manual
+  volumeName: audiobookshelf-config-pv
+  resources:
+    requests:
+      storage: 2Gi
