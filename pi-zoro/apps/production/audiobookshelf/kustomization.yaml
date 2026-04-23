@@ -6,8 +6,12 @@ resources:
   - namespace.yaml
   - pv-config.yaml
   - pv-metadata.yaml
+  - pv-audiobooks.yaml
+  - pv-podcasts.yaml
   - cloudflare-audiobookshelf.yaml
   - tunnel-credentials-audiobookshelf.yaml
 patches:
   - path: patch-pvc-config.yaml
   - path: patch-pvc-metadata.yaml
+  - path: patch-pvc-audiobooks.yaml
+  - path: patch-pvc-podcasts.yaml
