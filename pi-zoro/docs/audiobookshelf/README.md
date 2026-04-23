@@ -10,10 +10,15 @@ Self-hosted audiobook and podcast manager deployed on Kubernetes via GitOps. [ad
 |---------|----------|
 | Deployment | Flux GitOps — no manual `kubectl apply` |
 | Secrets | SOPS + Age encryption, safe to store in public Git |
-| Storage | PersistentVolumeClaims on local-path (NFS planned for production) |
-| External access | Cloudflare Tunnel — no open ports or port forwarding |
+| Storage — config | democratic-csi → iSCSI LUN on QNAP NAS — 2Gi, data off the Pi |
+| Storage — metadata | democratic-csi → iSCSI LUN on QNAP NAS — 2Gi, data off the Pi |
+| Storage — audiobooks | NFS share on QNAP NAS — 10Gi, ReadWriteMany |
+| Storage — podcasts | NFS share on QNAP NAS — 10Gi, ReadWriteMany |
+| CSI Driver | democratic-csi node-manual — handles iSCSI attach/detach between nodes automatically |
+| External access | Cloudflare Tunnel — no open ports or port forwarding (production only) |
 | Image updates | Renovate CronJob — automated PRs on new releases |
 | Security | Non-root container (node, UID 1000), privilege escalation blocked |
+| Staging | local-path for all volumes — kept intentionally for portfolio contrast |
 
 ---
 
@@ -24,10 +29,14 @@ Homelab/
   pi-zoro/
     apps/
       base/audiobookshelf/          ← environment-agnostic: deployment, service, PVCs, configmap
-      staging/audiobookshelf/       ← staging-specific: encrypted tunnel secret, cloudflared, kustomization
+      staging/audiobookshelf/       ← local-path, internal only, no Cloudflare
+      production/audiobookshelf/    ← iSCSI PVs, NFS PVs, PVC patches, Cloudflare tunnel
     clusters/
       staging/                      ← Flux entry point, SOPS config
-    infrastructure/                 ← Renovate and other controllers
+    infrastructure/
+      controllers/
+        base/democratic-csi/        ← CSI driver: HelmRelease, StorageClass, CHAP secret (shared with linkding)
+        staging/democratic-csi/     ← namespace + overlay wiring
     monitoring/                     ← kube-prometheus-stack
   docs/
     audiobookshelf/
@@ -35,7 +44,7 @@ Homelab/
   README.md                         ← homelab overview
 ```
 
-Base defines what Audiobookshelf needs to run. The staging layer stamps the namespace and adds environment-specific resources on top. The separation means a production environment can point at the same base without touching any shared files — only the delta lives in the environment layer.
+Base defines what Audiobookshelf needs to run. The staging layer stamps the namespace with local-path storage — no Cloudflare, no NAS. The production layer points at the same base and overrides all four volumes via patches. The delta lives entirely in the environment overlay, base is untouched.
 
 ---
 
@@ -45,23 +54,87 @@ Base defines what Audiobookshelf needs to run. The staging layer stamps the name
 
 **Container ran as root.** Confirmed via `cat /etc/passwd` inside the container. Identified `node` (UID 1000, GID 1000) as the intended user. Applied `runAsUser`, `runAsGroup`, and `fsGroup` at the pod level and `allowPrivilegeEscalation: false` at the container level. `fsGroup` is specifically required to make mounted volumes writable — without it the app gets permission denied errors despite running as the correct user.
 
-**Existing volume had wrong ownership after adding securityContext.** The pod previously ran as root, creating SQLite database files owned by `root:root`. When `runAsUser: 1000` was applied, the node user couldn't write to those files, causing `SQLITE_READONLY` crash loops. In staging, the config PVC was deleted and recreated fresh with correct ownership. In production the fix is an init container that runs as root, chowns the volume, then exits before the main container starts.
-
 **Secrets weren't safe to commit.** Kubernetes secrets are base64-encoded, not encrypted — effectively plain text in Git. Chose SOPS + Age because Flux has native integration requiring no extra tooling. Flux holds the private key inside the cluster and decrypts at deploy time. The key never touches the repo.
 
-**External access without open ports.** Cloudflare Tunnel provides outbound-only connectivity — no port forwarding, no exposed IPs. A dedicated tunnel was created for Audiobookshelf with its own credentials file, encrypted with SOPS and deployed through Flux.
+**Why iSCSI for config and metadata, NFS for audiobooks and podcasts.**
+
+Config holds the SQLite database and app settings. Metadata holds book covers and cached thumbnails. Both are write-heavy, structured, and need exclusive block device access — iSCSI is the right storage type. NFS would introduce consistency risks for a live database.
+
+Audiobooks and podcasts are large media files — read-heavy, append-only, no concurrent write risk. NFS is the right storage type here. It is ReadWriteMany, meaning both nodes can mount the share simultaneously with no attach/detach needed during failover.
+
+```
+/config     → iSCSI LUN 1 (2Gi)  — block storage, RWO, exclusive access
+/metadata   → iSCSI LUN 2 (2Gi)  — block storage, RWO, exclusive access
+/audiobooks → NFS share (10Gi)   — network share, RWX, mounts on any node
+/podcasts   → NFS share (10Gi)   — network share, RWX, mounts on any node
+```
+
+**Storage architecture evolution.**
+
+```
+Stage 1 — local-path (SD card)
+  All four volumes on the Pi's SD card
+  Unreliable for databases, no failover possible
+
+Stage 2 — Production environment with democratic-csi + NFS
+  Config and metadata → iSCSI LUNs on QNAP, managed by democratic-csi
+  Audiobooks and podcasts → NFS shares on QNAP
+  No nodeSelector — pod runs on either Zoro or Luffy
+  Single node failure is now survivable
+```
+
+**fstab cleanup before democratic-csi.** Both iSCSI LUNs were previously mounted on Zoro via fstab from manual setup. fstab and democratic-csi cannot both manage the same block device — fstab entries were removed from Zoro before Flux applied the PVs. This was the only manual step in the migration.
+
+**QNAP NFS fsid cache bug.** During NFS share setup, renaming a share does not generate a new fsid — QNAP caches the original. This caused inconsistent mount behaviour between nodes. Fix: delete the share completely, restart the NFS service on QNAP, recreate fresh. Both nodes then mounted consistently.
+
+**PVC accessMode immutability.** Changing base PVCs from `ReadWriteOnce` to `ReadWriteMany` caused Flux to fail — Kubernetes does not allow mutating accessModes on a bound PVC. Fix: scale deployment to 0, remove finalizers, force delete PVCs, force Flux reconcile. PVCs were recreated fresh with the correct spec.
+
+**Cloudflare tunnel moved from staging to production.** Staging had the only Cloudflare tunnel. It was moved to production as part of this migration — staging is now internal only. Production is the only environment with external access.
+
+**External access without open ports.** Cloudflare Tunnel provides outbound-only connectivity — no port forwarding, no exposed IPs. Credentials encrypted with SOPS and deployed through Flux.
 
 ---
 
-## 🚀 What's Next — Production Readiness
+## 🔄 Failover
 
-**NFS-backed storage.** `local-path` binds PVCs to the node's disk — media libraries belong on the QNAP NAS, not an SD card. The fix is NFS dynamic provisioning via `nfs-subdir-external-provisioner`, implemented as a Kustomize patch so staging is unaffected.
+Pod successfully rescheduled from Luffy to Zoro with all four volumes following.
 
-**Resource limits.** An unbounded container can starve other workloads on the node. Defining requests and limits sets the guaranteed floor and ceiling for CPU and memory.
+- iSCSI volumes (config, metadata) — democratic-csi detached from Luffy, reattached to Zoro automatically
+- NFS volumes (audiobooks, podcasts) — ReadWriteMany, no detach needed, mounted on Zoro immediately
 
-**Readiness and liveness probes.** Without them Kubernetes sends traffic to a pod the moment it starts, before the app is ready. Readiness holds traffic back, liveness restarts the pod if it stops responding.
+```
+Before: audiobookshelf running on Luffy
+Cordon Luffy → delete pod → reschedule
+After:  audiobookshelf running on Zoro — all data intact, app accessible
+```
 
-**TLS with cert-manager.** Current setup relies on Cloudflare Tunnel for HTTPS termination. A local TLS cert via cert-manager and Let's Encrypt would secure internal access as well.
+Staging intentionally kept on local-path — no failover, no NAS. The contrast between staging and production demonstrates the architectural difference clearly.
+
+---
+
+## ✅ Verified Final State
+
+```
+kubectl exec -n audiobookshelf-prod deploy/audiobookshelf -- df -h
+
+/dev/sdb                        1.9G   /config     ← iSCSI LUN 1
+/dev/sdc                        1.9G   /metadata   ← iSCSI LUN 2
+192.168.1.153:/audiobooks-nfs   7.4T   /audiobooks ← NFS
+192.168.1.153:/podcasts-nfs     7.4T   /podcasts   ← NFS
+```
+
+Zero volumes on SD card in production.
+
+---
+
+## 🚀 What's Next
+
+| Item | Status |
+|------|--------|
+| Resource limits | Pending — set after reviewing 1 week of Prometheus metrics |
+| Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back, liveness restarts if it stops responding. |
+| TLS with cert-manager | Current setup relies on Cloudflare Tunnel for HTTPS termination. cert-manager with Let's Encrypt would secure internal access as well. |
+| Secrets provider upgrade | SOPS + Age is solid for homelab. In a team environment, AWS KMS or HashiCorp Vault is the right call — centralised key management, audit logs, proper access policies. |
 
 ---
 
