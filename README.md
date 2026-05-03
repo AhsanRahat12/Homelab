@@ -1,5 +1,4 @@
 # 🏠 Homelab
-
 Self-hosted infrastructure running on a 2-node Raspberry Pi k3s cluster, managed with Flux for GitOps continuous deployment.
 
 ---
@@ -84,7 +83,16 @@ Four volumes with a deliberate storage split — config and metadata on iSCSI LU
 
 **Storage:** QNAP TS-464 serves both iSCSI LUNs (via democratic-csi) and NFS shares. iSCSI is used for database and structured data volumes. NFS is used for media. Storage is completely off the cluster nodes.
 
-**Monitoring:** Full observability stack via kube-prometheus-stack — Prometheus for metrics collection, Grafana for visualisation, accessible at `grs.rahatahsan.com`.
+### 📈 [kube-prometheus-stack](https://github.com/AhsanRahat12/Homelab/tree/main/pi-zoro/docs/Kube-Prometheus-Stack)
+Full observability stack — Prometheus for metrics collection, Grafana for dashboards and visualisation, Alertmanager for alert routing. Accessible at `grs.rahatahsan.com` on the local network.
+
+All three components were originally running on ephemeral emptyDir storage backed by SD cards — Prometheus TSDB is one of the worst workloads for SD card longevity, and every pod restart wiped all history. Migrated all three to dedicated iSCSI LUNs on QNAP via democratic-csi. Metrics and dashboards now survive restarts and redeployments. Write pressure is off the SD cards.
+
+| Component | Storage | Size |
+|-----------|---------|------|
+| Prometheus | iSCSI LUN on QNAP | 10Gi |
+| Grafana | iSCSI LUN on QNAP | 2Gi |
+| Alertmanager | iSCSI LUN on QNAP | 1Gi |
 
 **Automated Updates:** Renovate runs as a Kubernetes CronJob, scanning the repo every hour and opening Pull Requests for outdated images or Helm chart versions.
 
