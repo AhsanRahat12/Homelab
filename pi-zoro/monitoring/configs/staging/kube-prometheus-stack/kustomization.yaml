@@ -5,6 +5,4 @@ resources:
   - pv-prometheus.yaml
   - pv-grafana.yaml
   - pv-alertmanager.yaml
-  - pvc-prometheus.yaml
   - pvc-grafana.yaml
-  - pvc-alertmanager.yaml
