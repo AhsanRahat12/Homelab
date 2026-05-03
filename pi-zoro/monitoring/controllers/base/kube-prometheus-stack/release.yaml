@@ -70,12 +70,14 @@ spec:
         # Runs once as root before Prometheus starts
         # Fixes ownership on the iSCSI volume so Prometheus (non-root) can write to it
         # Exits immediately after — Prometheus then starts clean
+        # runAsNonRoot: false needed to override pod-level non-root policy for this init only
         initContainers:
           - name: fix-permissions
             image: busybox
             command: ["sh", "-c", "chown -R 1000:2000 /prometheus"]
             securityContext:
               runAsUser: 0
+              runAsNonRoot: false
             volumeMounts:
               - name: prometheus-kube-prometheus-stack-prometheus-db
                 mountPath: /prometheus
