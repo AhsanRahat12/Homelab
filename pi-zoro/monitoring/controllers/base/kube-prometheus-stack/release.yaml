@@ -67,7 +67,6 @@ spec:
           runAsGroup: 2000
           fsGroup: 2000
 
-
         # Runs once as root before Prometheus starts
         # Fixes ownership on the iSCSI volume so Prometheus (non-root) can write to it
         # Exits immediately after — Prometheus then starts clean
@@ -78,8 +77,8 @@ spec:
             securityContext:
               runAsUser: 0
             volumeMounts:
-              - name: prometheus-db
-                mountPath: /prometheus  
+              - name: prometheus-kube-prometheus-stack-prometheus-db
+                mountPath: /prometheus
 
         # Persistent storage — binds to prometheus-data-pv on QNAP
         # volumeName hard-binds to the specific PV we created manually
