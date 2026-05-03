@@ -39,12 +39,6 @@ spec:
       persistence:
         enabled: true
         existingClaim: grafana-data-pvc
-      additionalDataSources:
-        - name: Prometheus
-          type: prometheus
-          url: http://kube-prometheus-stack-prometheus:9090
-          access: proxy
-          isDefault: true
 
     prometheus:
       prometheusSpec:
