@@ -4,25 +4,23 @@ metadata:
   name: kube-prometheus-stack
   namespace: monitoring
 spec:
-  interval: 30m                   # Check for new chart versions every 30 minutes
+  interval: 30m
   chart:
     spec:
       chart: kube-prometheus-stack
-      version: "66.2.2"           # Pin to major.minor; patch updates apply automatically
-      # version: "58.x"           # Alternative: pin to major only
+      version: "66.2.2"
       sourceRef:
-        kind: HelmRepository      # Must match the `kind` in repository.yaml
-        name: kube-prometheus-stack  # Must match the `name` in repository.yaml
+        kind: HelmRepository
+        name: kube-prometheus-stack
         namespace: monitoring
       interval: 12h
   install:
-    crds: Create                  # Install CRDs bundled with the chart
+    crds: Create
   upgrade:
-    crds: CreateReplace           # On upgrade: create new CRDs, replace existing ones
+    crds: CreateReplace
   driftDetection:
-    mode: enabled                 # Treat the HelmRelease as source of truth; revert manual changes
+    mode: enabled
     ignore:
-      # Don't revert this annotation — it's added at runtime, not during install
       - paths: ["/metadata/annotations/prometheus-operator-validated"]
         target:
           kind: PrometheusRule
@@ -32,11 +30,44 @@ spec:
       ingress:
         enabled: true
         ingressClassName: traefik
-
         hosts:
           - grs.rahatahsan.com
-
         tls:
           - secretName: grafana-tls-secret
             hosts:
               - grs.rahatahsan.com
+      persistence:
+        enabled: true
+        existingClaim: grafana-data-pvc
+      additionalDataSources:
+        - name: Prometheus
+          type: prometheus
+          url: http://kube-prometheus-stack-prometheus:9090
+          access: proxy
+          isDefault: true
+
+    prometheus:
+      prometheusSpec:
+        retention: 30d
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: qnap-iscsi-manual
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 10Gi
+              volumeName: prometheus-data-pv
+
+    alertmanager:
+      alertmanagerSpec:
+        replicas: 1
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: qnap-iscsi-manual
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 1Gi
+              volumeName: alertmanager-data-pv
