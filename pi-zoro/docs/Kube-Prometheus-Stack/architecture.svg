@@ -55,7 +55,7 @@
 
 <!-- Arrow: grs → Grafana (into cluster) -->
 <line x1="170" y1="74" x2="130" y2="198" class="arr arr-coral" marker-end="url(#arrow)"/>
-<text class="sub gray-text" x="130" y="130">LAN only</text>
+<text class="sub gray-text" x="80" y="110">LAN only</text>
 
 <!-- Arrow: GitHub → Flux (into cluster) -->
 <line x1="520" y1="74" x2="555" y2="150" class="arr arr-purple" marker-end="url(#arrow)"/>
