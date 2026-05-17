@@ -1,6 +1,15 @@
 # 📚 Audiobookshelf
-
 Self-hosted audiobook and podcast manager deployed on Kubernetes via GitOps. [advplyr/audiobookshelf](https://github.com/advplyr/audiobookshelf)
+
+**Live at** [audiobooks.rahatahsan.com](https://audiobooks.rahatahsan.com)
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="architecture.svg" alt="Audiobookshelf production architecture diagram" width="680"/>
+</p>
 
 ---
 
@@ -10,12 +19,10 @@ Self-hosted audiobook and podcast manager deployed on Kubernetes via GitOps. [ad
 |---------|----------|
 | Deployment | Flux GitOps — no manual `kubectl apply` |
 | Secrets | SOPS + Age encryption, safe to store in public Git |
-| Storage — config | democratic-csi → iSCSI LUN on QNAP NAS — 2Gi, data off the Pi |
-| Storage — metadata | democratic-csi → iSCSI LUN on QNAP NAS — 2Gi, data off the Pi |
-| Storage — audiobooks | NFS share on QNAP NAS — 10Gi, ReadWriteMany |
-| Storage — podcasts | NFS share on QNAP NAS — 10Gi, ReadWriteMany |
+| Storage — config + metadata | democratic-csi → iSCSI LUNs on QNAP NAS — 2Gi each, data off the Pi |
+| Storage — audiobooks + podcasts | NFS shares on QNAP NAS — 10Gi each, ReadWriteMany |
 | CSI Driver | democratic-csi node-manual — handles iSCSI attach/detach between nodes automatically |
-| External access | Cloudflare Tunnel — no open ports or port forwarding (production only) |
+| External access | Cloudflare Tunnel → [audiobooks.rahatahsan.com](https://audiobooks.rahatahsan.com) — no open ports or port forwarding (production only) |
 | Image updates | Renovate CronJob — automated PRs on new releases |
 | Security | Non-root container (node, UID 1000), privilege escalation blocked |
 | Staging | local-path for all volumes — kept intentionally for portfolio contrast |
@@ -25,23 +32,17 @@ Self-hosted audiobook and podcast manager deployed on Kubernetes via GitOps. [ad
 ## 📁 Repo Structure
 
 ```
-Homelab/
-  pi-zoro/
-    apps/
-      base/audiobookshelf/          ← environment-agnostic: deployment, service, PVCs, configmap
-      staging/audiobookshelf/       ← local-path, internal only, no Cloudflare
-      production/audiobookshelf/    ← iSCSI PVs, NFS PVs, PVC patches, Cloudflare tunnel
-    clusters/
-      staging/                      ← Flux entry point, SOPS config
-    infrastructure/
-      controllers/
-        base/democratic-csi/        ← CSI driver: HelmRelease, StorageClass, CHAP secret (shared with linkding)
-        staging/democratic-csi/     ← namespace + overlay wiring
-    monitoring/                     ← kube-prometheus-stack
-  docs/
-    audiobookshelf/
-      README.md                     ← you are here
-  README.md                         ← homelab overview
+apps/
+  base/audiobookshelf/          ← deployment, service, PVCs, configmap (shared)
+  staging/audiobookshelf/       ← local-path, internal only, no Cloudflare
+  production/audiobookshelf/    ← iSCSI PVs, NFS PVs, PVC patches, Cloudflare tunnel
+clusters/
+  staging/                      ← Flux entry point, SOPS config
+infrastructure/
+  controllers/
+    base/democratic-csi/        ← HelmRelease, StorageClass, CHAP secret (shared with linkding)
+docs/
+  audiobookshelf/README.md      ← you are here
 ```
 
 Base defines what Audiobookshelf needs to run. The staging layer stamps the namespace with local-path storage — no Cloudflare, no NAS. The production layer points at the same base and overrides all four volumes via patches. The delta lives entirely in the environment overlay, base is untouched.
@@ -49,8 +50,6 @@ Base defines what Audiobookshelf needs to run. The staging layer stamps the name
 ---
 
 ## 🧠 Problems & Decisions
-
-**Data lost on pod restart.** Container storage is ephemeral by default. Added four PVCs mounted at `/config`, `/metadata`, `/audiobooks`, and `/podcasts` — data now survives pod restarts and redeployments.
 
 **Container ran as root.** Confirmed via `cat /etc/passwd` inside the container. Identified `node` (UID 1000, GID 1000) as the intended user. Applied `runAsUser`, `runAsGroup`, and `fsGroup` at the pod level and `allowPrivilegeEscalation: false` at the container level. `fsGroup` is specifically required to make mounted volumes writable — without it the app gets permission denied errors despite running as the correct user.
 
@@ -91,8 +90,6 @@ Stage 2 — Production environment with democratic-csi + NFS
 
 **Cloudflare tunnel moved from staging to production.** Staging had the only Cloudflare tunnel. It was moved to production as part of this migration — staging is now internal only. Production is the only environment with external access.
 
-**External access without open ports.** Cloudflare Tunnel provides outbound-only connectivity — no port forwarding, no exposed IPs. Credentials encrypted with SOPS and deployed through Flux.
-
 ---
 
 ## 🔄 Failover
@@ -116,7 +113,6 @@ Staging intentionally kept on local-path — no failover, no NAS. The contrast b
 
 ```
 kubectl exec -n audiobookshelf-prod deploy/audiobookshelf -- df -h
-
 /dev/sdb                        1.9G   /config     ← iSCSI LUN 1
 /dev/sdc                        1.9G   /metadata   ← iSCSI LUN 2
 192.168.1.153:/audiobooks-nfs   7.4T   /audiobooks ← NFS
@@ -133,7 +129,6 @@ Zero volumes on SD card in production.
 |------|--------|
 | Resource limits | Pending — set after reviewing 1 week of Prometheus metrics |
 | Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back, liveness restarts if it stops responding. |
-| TLS with cert-manager | Current setup relies on Cloudflare Tunnel for HTTPS termination. cert-manager with Let's Encrypt would secure internal access as well. |
 | Secrets provider upgrade | SOPS + Age is solid for homelab. In a team environment, AWS KMS or HashiCorp Vault is the right call — centralised key management, audit logs, proper access policies. |
 
 ---
