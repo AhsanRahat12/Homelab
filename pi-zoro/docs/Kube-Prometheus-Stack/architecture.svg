@@ -1,0 +1,122 @@
+<svg width="100%" viewBox="0 0 680 530" xmlns="http://www.w3.org/2000/svg">
+<title>kube-prometheus-stack production architecture</title>
+<desc>Grafana, Prometheus, and Alertmanager run on a two-node Kubernetes cluster. Grafana is accessible at grs.rahatahsan.com via Traefik ingress on the LAN. All three components store data on dedicated iSCSI LUNs on a QNAP NAS, managed by democratic-csi. Flux handles GitOps deployments from GitHub.</desc>
+
+<style>
+  text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .title { font-size: 14px; font-weight: 600; }
+  .sub { font-size: 12px; opacity: 0.7; }
+  .coral-fill { fill: #FFF0EB; stroke: #D85A30; }
+  .coral-text { fill: #712B13; }
+  .teal-fill { fill: #E1F5EE; stroke: #0F6E56; }
+  .teal-text { fill: #085041; }
+  .purple-fill { fill: #EEEDFE; stroke: #534AB7; }
+  .purple-text { fill: #3C3489; }
+  .gray-text { fill: #5F5E5A; }
+  .cluster-border { fill: none; stroke: #B4B2A9; stroke-dasharray: 6 4; }
+  .qnap-border { fill: #F8F7F4; stroke: #B4B2A9; }
+  .arr { stroke-width: 1.5; fill: none; }
+  .arr-coral { stroke: #D85A30; }
+  .arr-teal { stroke: #0F6E56; }
+  .arr-purple { stroke: #534AB7; }
+  .arr-muted { stroke: #888780; stroke-dasharray: 4 3; }
+
+  @media (prefers-color-scheme: dark) {
+    .coral-fill { fill: #4A1B0C; stroke: #F0997B; }
+    .coral-text { fill: #F5C4B3; }
+    .teal-fill { fill: #04342C; stroke: #5DCAA5; }
+    .teal-text { fill: #9FE1CB; }
+    .purple-fill { fill: #26215C; stroke: #AFA9EC; }
+    .purple-text { fill: #CECBF6; }
+    .gray-text { fill: #B4B2A9; }
+    .cluster-border { stroke: #5F5E5A; }
+    .qnap-border { fill: #2C2C2A; stroke: #5F5E5A; }
+    .arr-coral { stroke: #F0997B; }
+    .arr-teal { stroke: #5DCAA5; }
+    .arr-purple { stroke: #AFA9EC; }
+    .arr-muted { stroke: #888780; }
+    .sub { opacity: 0.6; }
+  }
+</style>
+
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<!-- grs.rahatahsan.com -->
+<rect class="coral-fill" x="40" y="30" width="260" height="44" rx="8" stroke-width="0.5"/>
+<text class="title coral-text" x="170" y="52" text-anchor="middle" dominant-baseline="central">grs.rahatahsan.com</text>
+
+<!-- GitHub -->
+<rect class="purple-fill" x="400" y="30" width="240" height="44" rx="8" stroke-width="0.5"/>
+<text class="title purple-text" x="520" y="52" text-anchor="middle" dominant-baseline="central">GitHub</text>
+
+<!-- Arrow: grs → Grafana (into cluster) -->
+<line x1="170" y1="74" x2="130" y2="198" class="arr arr-coral" marker-end="url(#arrow)"/>
+<text class="sub gray-text" x="130" y="130">LAN only</text>
+
+<!-- Arrow: GitHub → Flux (into cluster) -->
+<line x1="520" y1="74" x2="555" y2="150" class="arr arr-purple" marker-end="url(#arrow)"/>
+
+<!-- Kubernetes cluster container -->
+<rect class="cluster-border" x="25" y="110" width="630" height="250" rx="16" stroke-width="0.5"/>
+<text class="title gray-text" x="340" y="132" text-anchor="middle">Kubernetes cluster</text>
+<text class="sub gray-text" x="340" y="148" text-anchor="middle">Zoro + Luffy — pod schedules on either node</text>
+
+<!-- Flux -->
+<rect class="purple-fill" x="490" y="155" width="140" height="34" rx="8" stroke-width="0.5"/>
+<text class="title purple-text" x="560" y="172" text-anchor="middle" dominant-baseline="central">Flux</text>
+
+<!-- Flux → Prometheus (dashed, manages) -->
+<line x1="530" y1="189" x2="370" y2="198" class="arr arr-muted" marker-end="url(#arrow)"/>
+
+<!-- Grafana -->
+<rect class="teal-fill" x="45" y="200" width="165" height="56" rx="8" stroke-width="0.5"/>
+<text class="title teal-text" x="127" y="220" text-anchor="middle" dominant-baseline="central">Grafana</text>
+<text class="sub teal-text" x="127" y="240" text-anchor="middle" dominant-baseline="central">dashboards</text>
+
+<!-- Prometheus -->
+<rect class="teal-fill" x="240" y="200" width="170" height="56" rx="8" stroke-width="0.5"/>
+<text class="title teal-text" x="325" y="220" text-anchor="middle" dominant-baseline="central">Prometheus</text>
+<text class="sub teal-text" x="325" y="240" text-anchor="middle" dominant-baseline="central">metrics + TSDB</text>
+
+<!-- Alertmanager -->
+<rect class="teal-fill" x="440" y="200" width="175" height="56" rx="8" stroke-width="0.5"/>
+<text class="title teal-text" x="527" y="220" text-anchor="middle" dominant-baseline="central">Alertmanager</text>
+<text class="sub teal-text" x="527" y="240" text-anchor="middle" dominant-baseline="central">alert routing</text>
+
+<!-- democratic-csi -->
+<rect class="teal-fill" x="230" y="300" width="190" height="40" rx="8" stroke-width="0.5"/>
+<text class="title teal-text" x="325" y="320" text-anchor="middle" dominant-baseline="central">democratic-csi</text>
+
+<!-- Arrows: components → democratic-csi -->
+<line x1="127" y1="256" x2="258" y2="298" class="arr arr-teal" marker-end="url(#arrow)"/>
+<line x1="325" y1="256" x2="325" y2="298" class="arr arr-teal" marker-end="url(#arrow)"/>
+<line x1="527" y1="256" x2="395" y2="298" class="arr arr-teal" marker-end="url(#arrow)"/>
+
+<!-- Arrow: democratic-csi → QNAP -->
+<line x1="325" y1="340" x2="340" y2="398" class="arr arr-teal" marker-end="url(#arrow)"/>
+<text class="sub gray-text" x="348" y="375">iSCSI</text>
+
+<!-- QNAP NAS container -->
+<rect class="qnap-border" x="40" y="400" width="600" height="110" rx="16" stroke-width="0.5"/>
+<text class="title gray-text" x="340" y="422" text-anchor="middle">QNAP NAS</text>
+
+<!-- Prometheus LUN -->
+<rect class="teal-fill" x="55" y="438" width="175" height="56" rx="8" stroke-width="0.5"/>
+<text class="title teal-text" x="142" y="458" text-anchor="middle" dominant-baseline="central">Prometheus</text>
+<text class="sub teal-text" x="142" y="476" text-anchor="middle" dominant-baseline="central">TSDB, 10Gi</text>
+
+<!-- Grafana LUN -->
+<rect class="teal-fill" x="250" y="438" width="170" height="56" rx="8" stroke-width="0.5"/>
+<text class="title teal-text" x="335" y="458" text-anchor="middle" dominant-baseline="central">Grafana</text>
+<text class="sub teal-text" x="335" y="476" text-anchor="middle" dominant-baseline="central">SQLite, 2Gi</text>
+
+<!-- Alertmanager LUN -->
+<rect class="teal-fill" x="440" y="438" width="185" height="56" rx="8" stroke-width="0.5"/>
+<text class="title teal-text" x="532" y="458" text-anchor="middle" dominant-baseline="central">Alertmanager</text>
+<text class="sub teal-text" x="532" y="476" text-anchor="middle" dominant-baseline="central">state, 1Gi</text>
+
+</svg>

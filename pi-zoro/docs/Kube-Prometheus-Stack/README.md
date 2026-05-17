@@ -1,6 +1,16 @@
 # 📊 kube-prometheus-stack
 Self-hosted observability stack deployed on Kubernetes via GitOps. Provides cluster-wide metrics, dashboards, and alerting — backed by durable iSCSI storage on QNAP. [prometheus-community/kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
 
+**Grafana at** [grs.rahatahsan.com](https://grs.rahatahsan.com) — LAN only, not publicly accessible
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="architecture.svg" alt="kube-prometheus-stack production architecture diagram" width="680"/>
+</p>
+
 ---
 
 ## Stack
@@ -8,13 +18,11 @@ Self-hosted observability stack deployed on Kubernetes via GitOps. Provides clus
 | Concern | Solution |
 |---------|----------|
 | Deployment | Flux GitOps — HelmRelease, no manual `kubectl apply` |
-| Storage — Prometheus | democratic-csi → iSCSI LUN on QNAP NAS — 10Gi, data off the Pi |
-| Storage — Grafana | democratic-csi → iSCSI LUN on QNAP NAS — 2Gi, data off the Pi |
-| Storage — Alertmanager | democratic-csi → iSCSI LUN on QNAP NAS — 1Gi, data off the Pi |
+| Storage | democratic-csi → iSCSI LUNs on QNAP NAS — Prometheus 10Gi, Grafana 2Gi, Alertmanager 1Gi |
 | CSI Driver | democratic-csi node-manual — handles iSCSI attach/detach between nodes automatically |
 | Metrics retention | 30 days — explicit in HelmRelease values, prevents unbounded TSDB growth |
 | Dashboards | Auto-provisioned by chart sidecar — survive restarts and redeployments |
-| External access | Grafana exposed via Traefik ingress + TLS at grs.rahatahsan.com — local network only, not publicly accessible |
+| External access | Grafana exposed via Traefik ingress + TLS at grs.rahatahsan.com — local network only |
 | Image updates | Renovate CronJob — automated PRs on new releases |
 | Alertmanager replicas | 1 — single replica, correct for a 2-node cluster |
 
@@ -23,18 +31,14 @@ Self-hosted observability stack deployed on Kubernetes via GitOps. Provides clus
 ## 📁 Repo Structure
 
 ```
-Homelab/
-  pi-zoro/
-    monitoring/
-      controllers/
-        base/kube-prometheus-stack/   ← HelmRelease, HelmRepository, namespace
-        staging/kube-prometheus-stack/← kustomization overlay wiring
-      configs/
-        staging/kube-prometheus-stack/← PVs, Grafana PVC, TLS secret, kustomization
-  docs/
-    monitoring/
-      README.md                       ← you are here
-  README.md                           ← homelab overview
+monitoring/
+  controllers/
+    base/kube-prometheus-stack/      ← HelmRelease, HelmRepository, namespace
+    staging/kube-prometheus-stack/   ← kustomization overlay wiring
+  configs/
+    staging/kube-prometheus-stack/   ← PVs, Grafana PVC, TLS secret, kustomization
+docs/
+  monitoring/README.md               ← you are here
 ```
 
 The HelmRelease in `controllers/base` defines the full chart configuration including all storage values. The PVs and Grafana PVC live in `configs/staging` — they are static resources that must exist and be `Bound` before the HelmRelease reconciles.
@@ -44,7 +48,8 @@ The HelmRelease in `controllers/base` defines the full chart configuration inclu
 ## 🧠 Problems & Decisions
 
 **All three components were writing to SD cards with zero persistence.**
-The default Helm deployment uses emptyDir volumes — ephemeral storage backed by whatever the node has locally. On this cluster that means SD cards. Prometheus TSDB is one of the worst possible workloads for SD card longevity — constant writes, constant compaction, never idle. By the time the migration happened, the damage was already visible:
+
+The default Helm deployment uses emptyDir volumes — ephemeral storage backed by whatever the node has locally. On this cluster that means SD cards. Prometheus TSDB is one of the worst possible workloads for SD card longevity — constant writes, constant compaction, never idle. By the time the migration happened, both SD cards were at 67–69% capacity and growing. The damage was already visible:
 
 | Component | Restarts before migration | Impact |
 |---|---|---|
@@ -55,6 +60,7 @@ The default Helm deployment uses emptyDir volumes — ephemeral storage backed b
 Every Grafana restart meant manually reconfiguring the Prometheus datasource from scratch. Every Prometheus restart meant starting from zero — no history, no trends, no baselines. Fixed by migrating all three components to dedicated iSCSI LUNs on QNAP.
 
 **Operator-managed components own their own PVCs.**
+
 Grafana is a plain Deployment — Helm owns it directly. A PVC is created manually and handed to Helm via `existingClaim`.
 
 Prometheus and Alertmanager are StatefulSets managed by the Prometheus Operator. The Operator creates its own PVCs automatically from `volumeClaimTemplate` in the values. Manually creating PVCs for these components causes a collision — the Operator's auto-generated PVCs get stuck `Pending` because the PVs are already bound to the manual ones. The fix: create PVs only, let the Operator create the PVCs itself.
@@ -66,6 +72,7 @@ Alertmanager→ you create PV only  → Operator creates PVC automatically
 ```
 
 **Fresh iSCSI LUNs are root-owned — Prometheus cannot write to them.**
+
 Block LUNs are formatted with root ownership at the filesystem level. Prometheus runs as a non-root user (UID 1000) and gets `permission denied` on every write. Two things are required to fix this permanently:
 
 `fsGroup: 2000` in the pod securityContext tells Kubernetes to chown the mount point at attach time. An initContainer runs once as root before Prometheus starts and fixes ownership on the already-formatted volume. Both are needed because `fsGroup` alone does not retroactively fix an already-formatted filesystem.
@@ -86,6 +93,7 @@ initContainers:
 ```
 
 **Retain policy requires manual claimRef cleanup.**
+
 When a PVC bound to a `ReclaimPolicy: Retain` PV is deleted, the PV enters `Released` state. Kubernetes will not rebind it automatically — even if a new PVC with the right spec is created. The claimRef must be cleared manually before the PV becomes `Available` again:
 
 ```bash
@@ -93,12 +101,15 @@ kubectl patch pv <name> -p '{"spec":{"claimRef":null}}'
 ```
 
 **Grafana SQLite database corrupted during PVC transition.**
+
 During the migration the Grafana database was written to the new PVC in a partially corrupted state. Grafana served a white page and all operations returned `database disk image is malformed`. The fix was to scale down Grafana, delete the corrupted PVC, clear the PV claimRef, let Flux recreate the PVC fresh, then scale back up. Grafana booted with a clean database and the chart sidecar automatically reloaded all default dashboards. No data was lost — 12 prior restarts had already wiped everything.
 
 **Prometheus retention must be set explicitly.**
+
 Without a retention value, TSDB grows until the LUN is full. Set to 30 days in HelmRelease values. On a small cluster with default scrape targets, real usage is 1–3Gi — 10Gi provides 3–5x headroom.
 
 **Alertmanager must be single replica on a 2-node cluster.**
+
 A second Alertmanager replica has no scheduling guarantee on a 2-node cluster and will sit `Pending` indefinitely. `replicas: 1` is set explicitly in HelmRelease values to prevent this.
 
 ---
@@ -123,19 +134,6 @@ StorageClass: qnap-iscsi-manual
 | Grafana | 2Gi | SQLite DB + dashboards + plugins. Real usage under 200Mi. 2Gi is effectively infinite. |
 | Alertmanager | 1Gi | Silence rules and state only. Real usage under 50Mi. 1Gi is the minimum sensible LUN size. |
 
-**Storage evolution:**
-```
-Before → emptyDir (ephemeral, SD card)
-  Constant TSDB writes destroying SD card longevity
-  All data wiped on every pod restart
-  Both SD cards at 67–69% capacity and growing
-
-After → iSCSI LUNs on QNAP
-  Write pressure off the SD cards
-  Data survives pod restarts and redeployments
-  Capacity managed at the NAS level
-```
-
 ---
 
 ## 🚀 What's Next
@@ -145,7 +143,6 @@ After → iSCSI LUNs on QNAP
 | Resource limits | Pending — set after reviewing 1 week of Prometheus metrics to establish a real baseline |
 | Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back until the app is ready, liveness restarts if it stops responding. |
 | Alerting rules | Stack is collecting metrics but no alerts are configured. Needs rules for node pressure, pod crash loops, and PVC capacity thresholds. |
-
 
 ---
 
