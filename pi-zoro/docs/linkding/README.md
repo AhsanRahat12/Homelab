@@ -1,6 +1,15 @@
 # 🔖 Linkding
-
 Self-hosted bookmark manager deployed on Kubernetes via GitOps. [sissbruecker/linkding](https://github.com/sissbruecker/linkding)
+
+**Live at** [links.rahatahsan.com](https://links.rahatahsan.com)
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="architecture.svg" alt="Linkding production architecture diagram" width="680"/>
+</p>
 
 ---
 
@@ -13,8 +22,8 @@ Self-hosted bookmark manager deployed on Kubernetes via GitOps. [sissbruecker/li
 | Storage (staging) | local-path PVC — 200Mi, SD card constrained, intentional |
 | Storage (production) | democratic-csi → iSCSI LUN on QNAP NAS — 1Gi Thick provisioned, data off the Pi entirely |
 | CSI Driver | democratic-csi node-manual — handles iSCSI attach/detach between nodes automatically |
-| External access | Cloudflare Tunnel — no open ports or port forwarding (production only) |
-| Local access | Traefik Ingress + Cloudflare DNS A record |
+| External access | Cloudflare Tunnel → [links.rahatahsan.com](https://links.rahatahsan.com) — no open ports or port forwarding (production only) |
+| Local access | Traefik Ingress + Cloudflare DNS A record pointing to cluster LAN IP — resolves internally, not reachable externally |
 | Image updates | Renovate CronJob — automated PRs on new releases |
 | Security | Non-root container (www-data, UID 33), privilege escalation blocked |
 
@@ -23,29 +32,21 @@ Self-hosted bookmark manager deployed on Kubernetes via GitOps. [sissbruecker/li
 ## 📁 Repo Structure
 
 ```
-Homelab/
-  pi-zoro/
-    apps/
-      base/linkding/          ← environment-agnostic: deployment, service, PVC
-      staging/linkding/       ← staging-specific: encrypted secrets, PVC size patch, namespace
-      production/linkding/    ← production-specific: iSCSI PV, Cloudflare tunnel, encrypted secrets
-    clusters/
-      staging/                ← Flux entry point, SOPS config
-      staging/apps-production.yaml ← bootstraps production Kustomization from within staging cluster dir
-    infrastructure/
-      controllers/
-        base/democratic-csi/  ← CSI driver: HelmRelease, StorageClass, CHAP secret
-        staging/democratic-csi/ ← namespace + overlay wiring
-    monitoring/               ← kube-prometheus-stack
-  docs/
-    linkding/
-      README.md               ← you are here
-    migrations/
-      migrate-linkding.yaml   ← migration pod used to transfer data from staging to production PVC
-  README.md                   ← homelab overview
+apps/
+  base/linkding/              ← deployment, service, PVC (shared across environments)
+  staging/linkding/           ← namespace, encrypted secrets, PVC size patch
+  production/linkding/        ← iSCSI PV, Cloudflare tunnel, encrypted secrets
+clusters/
+  staging/                    ← Flux entry point, SOPS config
+infrastructure/
+  controllers/
+    base/democratic-csi/      ← HelmRelease, StorageClass, CHAP secret
+docs/
+  linkding/README.md          ← you are here
+  migrations/migrate-linkding.yaml
 ```
 
-Base defines what Linkding needs to run. The staging layer stamps the namespace, reduces PVC size for SD card constraints, and adds environment-specific secrets. The production layer points at the same base and overrides storage to iSCSI — the delta lives entirely in the environment overlay, base is untouched.
+Base defines what linkding needs to run. Staging stamps the namespace, reduces PVC size for SD card constraints, and injects environment-specific secrets. Production points at the same base and overrides storage to iSCSI — the delta lives entirely in the environment overlay, base is untouched.
 
 ---
 
@@ -112,7 +113,7 @@ Staging intentionally kept on local-path — no failover, no democratic-csi. The
 | Resource limits | Pending — set after reviewing 1 week of Prometheus metrics |
 | PostgreSQL backend | Pending — replace SQLite with PostgreSQL to enable stateless pods and multiple replicas. SQLite is a single-writer database tied to a single pod. PostgreSQL decouples the database from the application layer — linkding pods become stateless, horizontal scaling becomes possible, and failover is cleaner. Demonstrates how separating state from compute changes the operational model entirely. |
 | Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back, liveness restarts if it stops responding. |
-| TLS with cert-manager | Current self-signed cert triggers browser warnings. cert-manager with Let's Encrypt automates the full certificate lifecycle. |
+| TLS with cert-manager | Pending — production external traffic is already TLS-terminated by Cloudflare Tunnel. This is for internal Traefik ingress on the LAN, which currently serves a self-signed cert and triggers browser warnings. cert-manager with Let's Encrypt automates the full certificate lifecycle for internal access. |
 | Secrets provider upgrade | SOPS + Age is solid for homelab. In a team environment, AWS KMS or HashiCorp Vault is the right call — centralised key management, audit logs, proper access policies. |
 
 ---
