@@ -113,7 +113,6 @@ Staging intentionally kept on local-path — no failover, no democratic-csi. The
 | Resource limits | Pending — set after reviewing 1 week of Prometheus metrics |
 | PostgreSQL backend | Pending — replace SQLite with PostgreSQL to enable stateless pods and multiple replicas. SQLite is a single-writer database tied to a single pod. PostgreSQL decouples the database from the application layer — linkding pods become stateless, horizontal scaling becomes possible, and failover is cleaner. Demonstrates how separating state from compute changes the operational model entirely. |
 | Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back, liveness restarts if it stops responding. |
-| TLS with cert-manager | Pending — production external traffic is already TLS-terminated by Cloudflare Tunnel. This is for internal Traefik ingress on the LAN, which currently serves a self-signed cert and triggers browser warnings. cert-manager with Let's Encrypt automates the full certificate lifecycle for internal access. |
 | Secrets provider upgrade | SOPS + Age is solid for homelab. In a team environment, AWS KMS or HashiCorp Vault is the right call — centralised key management, audit logs, proper access policies. |
 
 ---
