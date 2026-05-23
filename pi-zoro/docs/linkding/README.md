@@ -1,6 +1,8 @@
 # 🔖 Linkding
 Self-hosted bookmark manager deployed on Kubernetes via GitOps. [sissbruecker/linkding](https://github.com/sissbruecker/linkding)
 
+Three-stage storage migration from SD card to fully automated iSCSI failover. No nodeSelector, no single point of failure.
+
 **Live at** [links.rahatahsan.com](https://links.rahatahsan.com)
 
 ---
@@ -110,10 +112,9 @@ Staging intentionally kept on local-path — no failover, no democratic-csi. The
 
 | Item | Status |
 |------|--------|
-| Resource limits | Pending — set after reviewing 1 week of Prometheus metrics |
-| PostgreSQL backend | Pending — replace SQLite with PostgreSQL to enable stateless pods and multiple replicas. SQLite is a single-writer database tied to a single pod. PostgreSQL decouples the database from the application layer — linkding pods become stateless, horizontal scaling becomes possible, and failover is cleaner. Demonstrates how separating state from compute changes the operational model entirely. |
-| Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back, liveness restarts if it stops responding. |
-| Secrets provider upgrade | SOPS + Age is solid for homelab. In a team environment, AWS KMS or HashiCorp Vault is the right call — centralised key management, audit logs, proper access policies. |
+| Resource limits | Planned — measure with Prometheus before setting |
+| Readiness and liveness probes | Planned |
+| PostgreSQL backend | Replace SQLite with PostgreSQL to decouple the database from the application layer. SQLite is a single-writer database tied to a single pod. PostgreSQL enables stateless pods, horizontal scaling, and cleaner failover. This is the next major architectural change for linkding. |
 
 ---
 
