@@ -1,6 +1,8 @@
 # 📚 Audiobookshelf
 Self-hosted audiobook and podcast manager deployed on Kubernetes via GitOps. [advplyr/audiobookshelf](https://github.com/advplyr/audiobookshelf)
 
+Four volumes, two storage backends (iSCSI + NFS), tested node failover, zero data on SD card in production.
+
 **Live at** [audiobooks.rahatahsan.com](https://audiobooks.rahatahsan.com)
 
 ---
@@ -109,27 +111,14 @@ Staging intentionally kept on local-path — no failover, no NAS. The contrast b
 
 ---
 
-## ✅ Verified Final State
-
-```
-kubectl exec -n audiobookshelf-prod deploy/audiobookshelf -- df -h
-/dev/sdb                        1.9G   /config     ← iSCSI LUN 1
-/dev/sdc                        1.9G   /metadata   ← iSCSI LUN 2
-192.168.1.153:/audiobooks-nfs   7.4T   /audiobooks ← NFS
-192.168.1.153:/podcasts-nfs     7.4T   /podcasts   ← NFS
-```
-
-Zero volumes on SD card in production.
-
 ---
 
 ## 🚀 What's Next
 
 | Item | Status |
 |------|--------|
-| Resource limits | Pending — set after reviewing 1 week of Prometheus metrics |
-| Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back, liveness restarts if it stops responding. |
-| Secrets provider upgrade | SOPS + Age is solid for homelab. In a team environment, AWS KMS or HashiCorp Vault is the right call — centralised key management, audit logs, proper access policies. |
+| Resource limits | Planned — measure with Prometheus before setting |
+| Readiness and liveness probes | Planned |
 
 ---
 
