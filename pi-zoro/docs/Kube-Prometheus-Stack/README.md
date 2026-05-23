@@ -1,6 +1,8 @@
 # 📊 kube-prometheus-stack
 Self-hosted observability stack deployed on Kubernetes via GitOps. Provides cluster-wide metrics, dashboards, and alerting — backed by durable iSCSI storage on QNAP. [prometheus-community/kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
 
+Migrated all three components off SD cards after 28 combined pod restarts wiped all metrics, dashboards, and alert state.
+
 **Grafana at** [grs.rahatahsan.com](https://grs.rahatahsan.com) — LAN only, not publicly accessible
 
 ---
@@ -114,19 +116,7 @@ A second Alertmanager replica has no scheduling guarantee on a 2-node cluster an
 
 ---
 
-## Storage Architecture
-
-```
-Prometheus   → PV → qnap-iscsi-manual → QNAP LUN ID 3 (10Gi)
-Grafana      → PV → qnap-iscsi-manual → QNAP LUN ID 4 (2Gi)
-Alertmanager → PV → qnap-iscsi-manual → QNAP LUN ID 5 (1Gi)
-
-Target IQN : iqn.2004-04.com.qnap:ts-464:iscsi.target-0.88196c
-Portal     : 192.168.1.153:3260
-StorageClass: qnap-iscsi-manual
-```
-
-**Why these sizes:**
+## Storage Sizing
 
 | Component | Size | Rationale |
 |---|---|---|
@@ -140,9 +130,10 @@ StorageClass: qnap-iscsi-manual
 
 | Item | Status |
 |------|--------|
-| Resource limits | Pending — set after reviewing 1 week of Prometheus metrics to establish a real baseline |
-| Readiness and liveness probes | Without them Kubernetes sends traffic to a pod the moment it starts. Readiness holds traffic back until the app is ready, liveness restarts if it stops responding. |
-| Alerting rules | Stack is collecting metrics but no alerts are configured. Needs rules for node pressure, pod crash loops, and PVC capacity thresholds. |
+| Resource limits | Planned — measure with Prometheus before setting |
+| Readiness and liveness probes | Planned |
+| Alerting rules | No alerts configured yet. Needs rules for node pressure, pod crash loops, and PVC capacity thresholds. |
+| Grafana PostgreSQL migration | Replace SQLite with PostgreSQL to eliminate corruption risk on storage interruptions. SQLite on iSCSI is fragile — one dropped connection can corrupt the database. |
 
 ---
 
