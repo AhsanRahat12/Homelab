@@ -31,6 +31,8 @@ spec:
           volumeMounts:
             - mountPath: /etc/linkding/data
               name: linkding-data
+            - mountPath: /tmp
+              name: tmp-dir
           
           ports:
             - containerPort: 9090
@@ -47,3 +49,5 @@ spec:
         - name: linkding-data
           persistentVolumeClaim:
             claimName: linkding-data-pvc
+        - name: tmp-dir
+          emptyDir: {}
