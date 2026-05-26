@@ -27,7 +27,7 @@ Three-stage storage migration from SD card to fully automated iSCSI failover. No
 | External access | Cloudflare Tunnel → [links.rahatahsan.com](https://links.rahatahsan.com) — no open ports or port forwarding (production only) |
 | Local access | Traefik Ingress + Cloudflare DNS A record pointing to cluster LAN IP — resolves internally, not reachable externally |
 | Image updates | Renovate CronJob — automated PRs on new releases |
-| Security | Non-root container (www-data, UID 33), privilege escalation blocked |
+| Security | PSA restricted enforced, non-root (UID 33), capabilities dropped, seccomp RuntimeDefault, read-only filesystem |
 
 ---
 
@@ -49,6 +49,58 @@ docs/
 ```
 
 Base defines what linkding needs to run. Staging stamps the namespace, reduces PVC size for SD card constraints, and injects environment-specific secrets. Production points at the same base and overrides storage to iSCSI — the delta lives entirely in the environment overlay, base is untouched.
+
+---
+
+## 🔒 Security
+
+Security is implemented in layers. Each layer assumes the previous one failed.
+
+### Pod Security Admission — namespace enforced
+
+The `linkding-prod` namespace enforces the `restricted` Pod Security Standard. Any pod that does not meet the standard is rejected at admission time before it ever runs.
+
+```yaml
+labels:
+  pod-security.kubernetes.io/enforce: restricted
+  pod-security.kubernetes.io/warn: restricted
+  pod-security.kubernetes.io/warn-version: latest
+```
+
+`warn` is kept alongside `enforce` so future violations surface immediately as warnings.
+
+### Pod Security Context
+
+The initial foundation was `runAsUser: 33`, `runAsGroup: 33`, `fsGroup: 33` (www-data), and `allowPrivilegeEscalation: false`. Implementing PSA restricted surfaced three additional gaps which were added deliberately.
+
+```yaml
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 33
+    runAsGroup: 33
+    fsGroup: 33
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+        - ALL
+```
+
+| Setting | What It Does |
+|---------|-------------|
+| `runAsNonRoot: true` | Kubernetes rejects the pod if the process would run as root |
+| `runAsUser: 33` | Process runs as `www-data`, not root |
+| `capabilities.drop: ALL` | All Linux kernel capabilities stripped — no raw sockets, no module loading, no ptrace |
+| `seccompProfile: RuntimeDefault` | Blocks dangerous kernel syscalls used in container breakout attacks |
+| `allowPrivilegeEscalation: false` | Process cannot gain more privileges mid-run — sudo and setuid binaries are blocked |
+| `readOnlyRootFilesystem: true` | Container cannot write to its own filesystem — no persistence for an attacker |
+
+`readOnlyRootFilesystem: true` required mounting an `emptyDir` at `/tmp` — linkding's process manager and web server both write pid files and temporary data there at startup. All application data writes go to the dedicated iSCSI-backed PVC.
 
 ---
 
@@ -91,6 +143,10 @@ Stage 3 — democratic-csi (current)
 **Cloudflare tunnel conflict.** One tunnel, two environments trying to claim it. Scaled staging Cloudflare to 0, deployed production pointing at the full cluster DNS (`linkding.linkding-prod.svc.cluster.local:9090`), removed Cloudflare from staging. Staging is now internal only via port-forward.
 
 **Base PVC size.** Reduced to 200Mi — production data lives on QNAP, SD card space is limited. Production patches up to 1Gi via `patch-pvc.yaml`.
+
+**iSCSI volume deadlock during rolling restarts.** Because the PVC is `ReadWriteOnce` on iSCSI, only one pod can hold the volume attachment at a time. During a rolling restart the old crashing pod kept the iSCSI lock — it was in CrashLoopBackOff, meaning Kubernetes kept restarting it before it fully released the attachment. The new pod got stuck in `ContainerCreating` indefinitely waiting for the volume to detach. Force deleting the old pod didn't help — the ReplicaSet immediately spawned a replacement which claimed the lock again. Fix: scale the deployment to zero to fully release the iSCSI attachment, wait for democratic-csi to complete the detach, then scale back to one. This came up twice — once when fixing the security context, once when flipping to enforce.
+
+**Implementing Pod Security Admission.** Started with `warn` mode so Kubernetes would flag problems without breaking anything. Three things were missing: the container still had Linux kernel capabilities it didn't need, `runAsNonRoot` wasn't set even though a non-root user was configured, and no syscall restrictions were in place. Each was added and the pod was tested after each change. Making the filesystem read-only caused a crash — linkding needs to write temporary files at startup and had nowhere to do it. Fixed by giving it a small writable directory in memory via `emptyDir`. Once everything was clean, the namespace was locked down to `enforce` — any pod that doesn't meet the standard is now rejected before it runs.
 
 ---
 
