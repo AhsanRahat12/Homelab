@@ -26,8 +26,7 @@ Four volumes, two storage backends (iSCSI + NFS), tested node failover, zero dat
 | CSI Driver | democratic-csi node-manual — handles iSCSI attach/detach between nodes automatically |
 | External access | Cloudflare Tunnel → [audiobooks.rahatahsan.com](https://audiobooks.rahatahsan.com) — no open ports or port forwarding (production only) |
 | Image updates | Renovate CronJob — automated PRs on new releases |
-| Security | Non-root container (node, UID 1000), privilege escalation blocked |
-| Staging | local-path for all volumes — kept intentionally for portfolio contrast |
+| Security | PSA restricted enforced, non-root (UID 1000), capabilities dropped, seccomp RuntimeDefault, read-only filesystem |
 
 ---
 
@@ -48,6 +47,58 @@ docs/
 ```
 
 Base defines what Audiobookshelf needs to run. The staging layer stamps the namespace with local-path storage — no Cloudflare, no NAS. The production layer points at the same base and overrides all four volumes via patches. The delta lives entirely in the environment overlay, base is untouched.
+
+---
+
+## 🔒 Security
+
+Security is implemented in layers. Each layer assumes the previous one failed.
+
+### Pod Security Admission — namespace enforced
+
+The `audiobookshelf-prod` namespace enforces the `restricted` Pod Security Standard. Any pod that does not meet the standard is rejected at admission time before it ever runs.
+
+```yaml
+labels:
+  pod-security.kubernetes.io/enforce: restricted
+  pod-security.kubernetes.io/warn: restricted
+  pod-security.kubernetes.io/warn-version: latest
+```
+
+`warn` is kept alongside `enforce` so future violations surface immediately as warnings.
+
+### Pod Security Context
+
+The initial foundation was `runAsUser: 1000`, `runAsGroup: 1000`, `fsGroup: 1000`, and `allowPrivilegeEscalation: false`. Implementing PSA restricted surfaced three additional gaps which were added deliberately.
+
+```yaml
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+        - ALL
+```
+
+| Setting | What It Does |
+|---------|-------------|
+| `runAsNonRoot: true` | Kubernetes rejects the pod if the process would run as root |
+| `runAsUser: 1000` | Process runs as the `node` user, not root |
+| `capabilities.drop: ALL` | All Linux kernel capabilities stripped — no raw sockets, no module loading, no ptrace |
+| `seccompProfile: RuntimeDefault` | Blocks dangerous kernel syscalls used in container breakout attacks |
+| `allowPrivilegeEscalation: false` | Process cannot gain more privileges mid-run — sudo and setuid binaries are blocked |
+| `readOnlyRootFilesystem: true` | Container cannot write to its own filesystem — no persistence for an attacker |
+
+All writes go to dedicated mounted volumes (PVCs), not the container filesystem.
 
 ---
 
@@ -92,6 +143,8 @@ Stage 2 — Production environment with democratic-csi + NFS
 
 **Cloudflare tunnel moved from staging to production.** Staging had the only Cloudflare tunnel. It was moved to production as part of this migration — staging is now internal only. Production is the only environment with external access.
 
+**Implementing Pod Security Admission.** Started with `warn` mode to identify violations without breaking the running pod. The warnings revealed three gaps: `capabilities.drop: ALL` was missing, `runAsNonRoot: true` was not set despite `runAsUser: 1000` being present, and no `seccompProfile` was defined. Each of these was added deliberately — capability drops remove kernel-level attack surface, `runAsNonRoot` enforces the non-root requirement at the Kubernetes level rather than relying on the image, and `seccompProfile: RuntimeDefault` blocks the syscalls most commonly used in container breakout attacks. Once the pod ran clean with zero warnings, the namespace label was updated from `warn` to `enforce`. Any pod that does not meet the restricted standard is now rejected before it runs.
+
 ---
 
 ## 🔄 Failover
@@ -108,8 +161,6 @@ After:  audiobookshelf running on Zoro — all data intact, app accessible
 ```
 
 Staging intentionally kept on local-path — no failover, no NAS. The contrast between staging and production demonstrates the architectural difference clearly.
-
----
 
 ---
 
