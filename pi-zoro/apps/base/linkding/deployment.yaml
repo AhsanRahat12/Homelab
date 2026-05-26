@@ -13,9 +13,12 @@ spec:
         app: linkding
     spec:
       securityContext:
+        runAsNonRoot: true
         fsGroup: 33 # www-data group ID
         runAsUser: 33 # www-data user ID
         runAsGroup: 33 # www-data group ID
+          seccompProfile:
+            type: RuntimeDefault
       
       containers:
         - name: linkding
@@ -34,6 +37,10 @@ spec:
 
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+              - ALL
 
 
       volumes:
