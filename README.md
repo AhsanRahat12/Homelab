@@ -11,6 +11,14 @@ Storage is deliberately separated from compute. Persistent data lives on a QNAP 
 
 ---
 
+## Architecture
+
+<p align="center">
+  <img src="HomeLab_Architecture.png" alt="Homelab architecture diagram" width="680"/>
+</p>
+
+---
+
 ## 🖥️ Hardware
 
 | Node | Hardware | Role |
@@ -95,7 +103,3 @@ All three components were originally running on ephemeral emptyDir storage backe
 | Alertmanager | iSCSI LUN on QNAP | 1Gi |
 
 **Automated Updates:** Renovate runs as a Kubernetes CronJob, scanning the repo every hour and opening Pull Requests for outdated images or Helm chart versions.
-
----
-
-*Part of my broader DevOps learning journey — [main profile](https://github.com/AhsanRahat12)*
