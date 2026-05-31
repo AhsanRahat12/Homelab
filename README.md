@@ -13,9 +13,7 @@ Storage is deliberately separated from compute. Persistent data lives on a QNAP 
 
 ## Architecture
 
-<p align="center">
-  <img src="HomeLab_Architecture.svg" alt="Homelab architecture diagram" width="680"/>
-</p>
+![Homelab architecture diagram](HomeLab_Architecture.svg)
 
 ---
 
