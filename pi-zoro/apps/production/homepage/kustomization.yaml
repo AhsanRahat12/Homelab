@@ -4,5 +4,5 @@ namespace: homepage
 resources:
   - ../../base/homepage/
   - namespace.yaml
-  - cloudflare-secret.yaml
-  - cloudflare.yaml
+  - homepage-cloudflare-secret.yaml
+  - homepage-cloudflare.yaml
