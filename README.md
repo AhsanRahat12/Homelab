@@ -13,9 +13,7 @@ Storage is deliberately separated from compute. Persistent data lives on a QNAP 
 
 ## Architecture
 
-<p align="center">
-  <img src="HomeLab_Architecture.png" alt="Homelab architecture diagram" width="680"/>
-</p>
+![Homelab architecture diagram](HomeLab_Architecture.svg)
 
 ---
 
@@ -84,6 +82,11 @@ Storage went through three stages — SD card → static iSCSI PV pinned to Zoro
 Self-hosted audiobook and podcast server. Accessible at `audiobooks.rahatahsan.com` via Cloudflare Tunnel.
 
 Four volumes with a deliberate storage split — config and metadata on iSCSI LUNs (democratic-csi, block storage, RWO), audiobooks and podcasts on NFS shares (RWX, mounts on any node with no detach needed). Zero volumes on SD card in production. Full failover tested and proven.
+
+### 🏠 [Homepage](./pi-zoro/docs/homepage/README.md)
+Cluster startpage and app dashboard. Accessible at `homepage.rahatahsan.com` via Cloudflare Tunnel.
+
+Single pod, no persistence — config lives entirely in Git via ConfigMap. Integrates with the Kubernetes API via a dedicated ClusterRole to display live cluster metrics, node CPU and memory, and pod counts. All apps in the cluster are linked from a single dashboard. PSA baseline enforced on the namespace, restricted audited.
 
 ---
 

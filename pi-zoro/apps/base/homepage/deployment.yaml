@@ -32,7 +32,7 @@ spec:
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false  # homepage writes internal cache
+            readOnlyRootFilesystem: false
             capabilities:
               drop: [ALL]
           env:
@@ -92,6 +92,9 @@ spec:
             - mountPath: /app/config/widgets.yaml
               name: homepage-config
               subPath: widgets.yaml
+            - mountPath: /app/config/proxmox.yaml
+              name: homepage-config
+              subPath: proxmox.yaml
             - mountPath: /app/config/logs
               name: logs
       volumes:

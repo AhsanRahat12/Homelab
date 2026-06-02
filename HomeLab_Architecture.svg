@@ -1,0 +1,121 @@
+<svg width="1100" height="620" viewBox="0 0 1100 620" xmlns="http://www.w3.org/2000/svg">
+<title>Homelab architecture</title>
+<desc>A k3s cluster on two Raspberry Pi nodes managed by Flux from GitHub. Workloads schedule freely across both nodes. Storage lives on a QNAP NAS via iSCSI and NFS. Services are exposed through Cloudflare Tunnel and Tailscale.</desc>
+
+<style>
+  text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .h { font-size: 18px; font-weight: 600; }
+  .lbl { font-size: 16px; font-weight: 500; }
+  .s { font-size: 13.5px; }
+  .region { fill: #FAFAF9; stroke: #C4BFB9; stroke-width: 1.25; }
+  .region-t { fill: #44403C; }
+  .card { fill: #FFFFFF; stroke-width: 1.25; }
+  .card-sub { fill: #57534E; }
+  .accent-bar { stroke-width: 3; stroke-linecap: round; }
+  .teal { stroke: #0B5C55; } .teal-t { fill: #0B5C55; }
+  .indigo { stroke: #3730A3; } .indigo-t { fill: #3730A3; }
+  .amber { stroke: #92400E; } .amber-t { fill: #92400E; }
+  .sky { stroke: #075985; } .sky-t { fill: #075985; }
+  .rose { stroke: #9F1239; } .rose-t { fill: #9F1239; }
+  .emerald { stroke: #065F46; } .emerald-t { fill: #065F46; }
+  .card-border { stroke: #C4BFB9; }
+  .arr { stroke: #78716C; stroke-width: 1.5; fill: none; }
+  .arr-lbl { fill: #78716C; font-size: 13px; }
+
+  @media (prefers-color-scheme: dark) {
+    .region { fill: #1C1917; stroke: #292524; }
+    .region-t { fill: #A8A29E; }
+    .card { fill: #292524; }
+    .card-sub { fill: #A8A29E; }
+    .teal { stroke: #2DD4BF; } .teal-t { fill: #2DD4BF; }
+    .indigo { stroke: #A5B4FC; } .indigo-t { fill: #A5B4FC; }
+    .amber { stroke: #FBBF24; } .amber-t { fill: #FBBF24; }
+    .sky { stroke: #7DD3FC; } .sky-t { fill: #7DD3FC; }
+    .rose { stroke: #FDA4AF; } .rose-t { fill: #FDA4AF; }
+    .emerald { stroke: #6EE7B7; } .emerald-t { fill: #6EE7B7; }
+    .card-border { stroke: #44403C; }
+    .arr { stroke: #57534E; }
+    .arr-lbl { fill: #78716C; }
+  }
+</style>
+
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<rect class="card card-border" x="40" y="70" width="210" height="66" rx="10"/>
+<line class="accent-bar emerald" x1="40" y1="82" x2="40" y2="124"/>
+<text class="lbl emerald-t" x="62" y="100">GitHub repo</text>
+<text class="s card-sub" x="62" y="120">Source of truth</text>
+
+<rect class="card card-border" x="40" y="166" width="210" height="66" rx="10"/>
+<line class="accent-bar rose" x1="40" y1="178" x2="40" y2="220"/>
+<text class="lbl rose-t" x="62" y="196">Renovate</text>
+<text class="s card-sub" x="62" y="216">Automated image PRs</text>
+
+<line class="arr" x1="145" y1="166" x2="145" y2="138" marker-end="url(#ah)"/>
+<text class="arr-lbl" x="153" y="154">opens PRs</text>
+
+<line class="arr" x1="250" y1="103" x2="326" y2="103" marker-end="url(#ah)"/>
+<text class="arr-lbl" x="288" y="95" text-anchor="middle">Flux sync</text>
+
+<line class="arr" x1="250" y1="199" x2="326" y2="199" marker-end="url(#ah)"/>
+
+<rect class="region" x="330" y="50" width="500" height="360" rx="14"/>
+<text class="h region-t" x="354" y="82">k3s cluster</text>
+<text class="s region-t" x="354" y="100" opacity="0.8">Pods schedule freely across both nodes · failover automatic</text>
+
+<rect class="card teal" x="354" y="120" width="216" height="54" rx="9" stroke-width="1.25"/>
+<text class="lbl teal-t" x="372" y="142">zoro</text>
+<text class="s card-sub" x="372" y="160">control plane · Pi 5 · 16GB</text>
+
+<rect class="card amber" x="590" y="120" width="216" height="54" rx="9" stroke-width="1.25"/>
+<text class="lbl amber-t" x="608" y="142">luffy</text>
+<text class="s card-sub" x="608" y="160">worker · Pi 5 · 16GB</text>
+
+<rect class="region" x="354" y="198" width="452" height="192" rx="10"/>
+<text class="s region-t" x="372" y="220" opacity="0.8">workloads</text>
+
+<rect class="card indigo" x="372" y="234" width="106" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="425" y="255" text-anchor="middle">homepage</text>
+<rect class="card indigo" x="490" y="234" width="96" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="538" y="255" text-anchor="middle">linkding</text>
+<rect class="card indigo" x="598" y="234" width="120" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="658" y="255" text-anchor="middle">audiobookshelf</text>
+<rect class="card indigo" x="730" y="234" width="58" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="759" y="255" text-anchor="middle">grafana</text>
+
+<rect class="card sky" x="372" y="280" width="102" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="423" y="301" text-anchor="middle">prometheus</text>
+<rect class="card sky" x="486" y="280" width="106" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="539" y="301" text-anchor="middle">alertmanager</text>
+<rect class="card sky" x="604" y="280" width="116" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="662" y="301" text-anchor="middle">democratic-csi</text>
+<rect class="card sky" x="732" y="280" width="56" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="760" y="301" text-anchor="middle">traefik</text>
+
+<rect class="card emerald" x="372" y="326" width="70" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="407" y="347" text-anchor="middle">sops</text>
+<rect class="card emerald" x="454" y="326" width="110" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="509" y="347" text-anchor="middle">renovate-job</text>
+
+<rect class="card card-border" x="884" y="70" width="216" height="130" rx="12"/>
+<line class="accent-bar amber" x1="884" y1="82" x2="884" y2="188"/>
+<text class="lbl amber-t" x="904" y="98">QNAP NAS</text>
+<text class="s card-sub" x="904" y="126">iSCSI · config, metadata</text>
+<text class="s card-sub" x="904" y="148">NFS · audiobooks, podcasts</text>
+<text class="s card-sub" x="904" y="170">block RWO + network RWX</text>
+
+<line class="arr" x1="830" y1="135" x2="882" y2="135" marker-end="url(#ah)"/>
+<text class="arr-lbl" x="856" y="127" text-anchor="middle">storage</text>
+
+<rect class="card card-border" x="354" y="446" width="280" height="130" rx="12"/>
+<line class="accent-bar sky" x1="354" y1="458" x2="354" y2="564"/>
+<text class="lbl sky-t" x="374" y="474">Networking</text>
+<text class="s card-sub" x="374" y="500">Cloudflare Tunnel</text>
+<text class="s card-sub" x="374" y="520">no open ports · public DNS</text>
+<text class="s card-sub" x="374" y="540">Tailscale · grafana on LAN</text>
+
+<line class="arr" x1="494" y1="410" x2="494" y2="444" marker-end="url(#ah)"/>
+<text class="arr-lbl" x="502" y="430" text-anchor="start">ingress</text>
+
+<rect class="card card-border" x="694" y="446" width="280" height="130" rx="12"/>
+<line class="accent-bar emerald" x1="694" y1="458" x2="694" y2="564"/>
+<text class="lbl emerald-t" x="714" y="500">Internet</text>
+<text class="s card-sub" x="714" y="526">homepage · links · audiobooks</text>
+
+<line class="arr" x1="634" y1="511" x2="692" y2="511" marker-end="url(#ah)"/>
+
+</svg>
