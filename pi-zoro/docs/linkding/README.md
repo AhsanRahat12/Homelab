@@ -28,6 +28,8 @@ Three-stage storage migration from SD card to fully automated iSCSI failover. No
 | Local access | Traefik Ingress + Cloudflare DNS A record pointing to cluster LAN IP — resolves internally, not reachable externally |
 | Image updates | Renovate CronJob — automated PRs on new releases |
 | Security | PSA restricted enforced, non-root (UID 33), capabilities dropped, seccomp RuntimeDefault, read-only filesystem |
+| Deploy strategy | `Recreate` — RWO iSCSI volume requires single-pod exclusive access, RollingUpdate causes deadlock |
+| Health checks | Readiness + liveness probes on `/health` port 9090 |
 
 ---
 
@@ -148,6 +150,10 @@ Stage 3 — democratic-csi (current)
 
 **Implementing Pod Security Admission.** Started with `warn` mode so Kubernetes would flag problems without breaking anything. Three things were missing: the container still had Linux kernel capabilities it didn't need, `runAsNonRoot` wasn't set even though a non-root user was configured, and no syscall restrictions were in place. Each was added and the pod was tested after each change. Making the filesystem read-only caused a crash — linkding needs to write temporary files at startup and had nowhere to do it. Fixed by giving it a small writable directory in memory via `emptyDir`. Once everything was clean, the namespace was locked down to `enforce` — any pod that doesn't meet the standard is now rejected before it runs.
 
+**Recreate strategy added — June 2026.** RWO iSCSI volume means only one pod can hold the attachment at a time. RollingUpdate tries to bring the new pod up before killing the old one — guaranteed deadlock on every deploy. `strategy: Recreate` added explicitly. Will be revisited when CNPG migration lands and the storage architecture changes.
+
+**Readiness and liveness probes added — June 2026.** Linkding exposes `/health` on port 9090 — confirmed against the live pod, returns `{"version": "1.45.0", "status": "healthy"}`. Startup confirmed at ~7s from timestamped logs. No startupProbe needed. Readiness at 10s, liveness at 40s — readiness always fires first (golden rule). Liveness period kept at 30s to avoid aggressive restarts on a stateful SQLite app. Detection: readiness 30s, liveness 90s worst case.
+
 ---
 
 ## 🔄 Failover
@@ -169,8 +175,7 @@ Staging intentionally kept on local-path — no failover, no democratic-csi. The
 | Item | Status |
 |------|--------|
 | Resource limits | Planned — measure with Prometheus before setting |
-| Readiness and liveness probes | Planned |
-| PostgreSQL backend | Replace SQLite with PostgreSQL to decouple the database from the application layer. SQLite is a single-writer database tied to a single pod. PostgreSQL enables stateless pods, horizontal scaling, and cleaner failover. This is the next major architectural change for linkding. |
+| PostgreSQL backend | Replace SQLite with PostgreSQL via CloudNative PG. Enables stateless pods, horizontal scaling, and cleaner failover. Next major architectural change. |
 
 ---
 
