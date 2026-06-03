@@ -27,6 +27,8 @@ Four volumes, two storage backends (iSCSI + NFS), tested node failover, zero dat
 | External access | Cloudflare Tunnel → [audiobooks.rahatahsan.com](https://audiobooks.rahatahsan.com) — no open ports or port forwarding (production only) |
 | Image updates | Renovate CronJob — automated PRs on new releases |
 | Security | PSA restricted enforced, non-root (UID 1000), capabilities dropped, seccomp RuntimeDefault, read-only filesystem |
+| Deploy strategy | `Recreate` — RWO iSCSI volumes require single-pod exclusive access, RollingUpdate causes deadlock |
+| Health checks | Readiness + liveness probes on `/healthcheck` port 3005 |
 
 ---
 
@@ -145,6 +147,10 @@ Stage 2 — Production environment with democratic-csi + NFS
 
 **Implementing Pod Security Admission.** Started with `warn` mode to identify violations without breaking the running pod. The warnings revealed three gaps: `capabilities.drop: ALL` was missing, `runAsNonRoot: true` was not set despite `runAsUser: 1000` being present, and no `seccompProfile` was defined. Each of these was added deliberately — capability drops remove kernel-level attack surface, `runAsNonRoot` enforces the non-root requirement at the Kubernetes level rather than relying on the image, and `seccompProfile: RuntimeDefault` blocks the syscalls most commonly used in container breakout attacks. Once the pod ran clean with zero warnings, the namespace label was updated from `warn` to `enforce`. Any pod that does not meet the restricted standard is now rejected before it runs.
 
+**RollingUpdate + RWO caused deadlock and filesystem corruption — June 2026.** No explicit strategy meant Kubernetes defaulted to RollingUpdate. Renovate bumped the image, the new pod sat in `ContainerCreating` for 24 hours because the RWO iSCSI volumes were held by the old pod. `kubectl rollout restart` forced both pods to die simultaneously — the unclean detach corrupted the ext4 journal on the metadata LUN. Every write threw `EIO`. The pod showed `1/1 Running` with zero restarts while completely dead inside — no liveness probe to catch it. Recovery came when Flux reconciled and democratic-csi provisioned a fresh device attachment. Fix: `strategy: Recreate` added explicitly. The corrupted metadata LUN still needs `fsck` at the next maintenance window.
+
+**Readiness and liveness probes added — June 2026.** ABS exposes `/healthcheck` on port 3005. Startup confirmed at 613ms from timestamped logs — no startupProbe needed. Readiness at 5s, liveness at 30s — readiness always fires first (golden rule). Liveness period kept generous at 20s to avoid false positives during library scans.
+
 ---
 
 ## 🔄 Failover
@@ -169,7 +175,6 @@ Staging intentionally kept on local-path — no failover, no NAS. The contrast b
 | Item | Status |
 |------|--------|
 | Resource limits | Planned — measure with Prometheus before setting |
-| Readiness and liveness probes | Planned |
 
 ---
 
