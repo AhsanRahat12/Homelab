@@ -14,37 +14,46 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        fsGroup: 33 # www-data group ID
-        runAsUser: 33 # www-data user ID
-        runAsGroup: 33 # www-data group ID
+        fsGroup: 33
+        runAsUser: 33
+        runAsGroup: 33
         seccompProfile:
           type: RuntimeDefault
-      
       containers:
         - name: linkding
           image: sissbruecker/linkding:1.45.0
-
           envFrom:
             - secretRef:
                 name: linkding-container-env
-          
           volumeMounts:
             - mountPath: /etc/linkding/data
               name: linkding-data
             - mountPath: /tmp
               name: tmp-dir
-          
           ports:
             - containerPort: 9090
-
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop:
               - ALL
-
-
       volumes:
         - name: linkding-data
           persistentVolumeClaim:
