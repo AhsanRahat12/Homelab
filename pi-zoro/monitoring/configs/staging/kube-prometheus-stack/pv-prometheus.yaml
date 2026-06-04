@@ -4,7 +4,7 @@ metadata:
   name: prometheus-data-pv
 spec:
   capacity:
-    storage: 10Gi
+    storage: 35Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
