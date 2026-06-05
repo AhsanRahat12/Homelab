@@ -4,17 +4,7 @@ metadata:
   name: cnpg-cluster
 spec:
   instances: 2
-  initContainers:
-    - name: fix-permissions
-      image: busybox
-      command: ["sh", "-c", "chown -R 26:26 /var/lib/postgresql/data"]
-      securityContext:
-        runAsUser: 0
-        runAsNonRoot: false
-        allowPrivilegeEscalation: true
-      volumeMounts:
-        - name: pgdata
-          mountPath: /var/lib/postgresql/data
+
 
   imageName: ghcr.io/cloudnative-pg/postgresql:16.8
 
