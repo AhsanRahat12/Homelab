@@ -3,6 +3,8 @@ kind: PersistentVolume
 metadata:
   name: cnpg-replica-pv
 spec:
+  name: cnpg-cluster-1
+  namespace: cnpg
   capacity:
     storage: 20Gi
   accessModes:
