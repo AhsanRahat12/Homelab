@@ -1,0 +1,57 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-cluster
+spec:
+  instances: 2
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.8
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: cnpg-cluster
+
+  postgresql:
+    parameters:
+      shared_buffers: "128MB"
+      effective_cache_size: "256MB"
+      maintenance_work_mem: "32MB"
+      max_connections: "100"
+      wal_level: "logical"
+
+  storage:
+    size: 20Gi
+    storageClass: qnap-iscsi-manual
+
+  superuserSecret:
+    name: cnpg-superuser
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://cnpg-backups/
+      endpointURL: http://192.168.1.153:9000
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-barman-s3
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-barman-s3
+          key: SECRET_ACCESS_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        immediateCheckpoint: false
+        jobs: 2
+    retentionPolicy: "30d"
