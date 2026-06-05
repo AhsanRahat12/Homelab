@@ -4,3 +4,5 @@ resources:
   - renovate
   - democratic-csi
   - cert-manager
+  - cnpg
+  - cnpg-barman-plugin
