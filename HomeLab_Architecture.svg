@@ -1,6 +1,6 @@
-<svg width="1100" height="620" viewBox="0 0 1100 620" xmlns="http://www.w3.org/2000/svg">
+<svg width="1100" height="680" viewBox="0 0 1100 680" xmlns="http://www.w3.org/2000/svg">
 <title>Homelab architecture</title>
-<desc>A k3s cluster on two Raspberry Pi nodes managed by Flux from GitHub. Workloads schedule freely across both nodes. Storage lives on a QNAP NAS via iSCSI and NFS. Services are exposed through Cloudflare Tunnel and Tailscale.</desc>
+<desc>A k3s cluster on two Raspberry Pi nodes managed by Flux from GitHub. Workloads schedule freely across both nodes. A 2-instance HA PostgreSQL cluster runs on dedicated iSCSI storage with backups to Minio. Storage lives on a QNAP NAS via iSCSI and NFS. Services are exposed through Cloudflare Tunnel and Tailscale.</desc>
 
 <style>
   text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
@@ -18,6 +18,7 @@
   .sky { stroke: #075985; } .sky-t { fill: #075985; }
   .rose { stroke: #9F1239; } .rose-t { fill: #9F1239; }
   .emerald { stroke: #065F46; } .emerald-t { fill: #065F46; }
+  .violet { stroke: #6B21A8; } .violet-t { fill: #6B21A8; }
   .card-border { stroke: #C4BFB9; }
   .arr { stroke: #78716C; stroke-width: 1.5; fill: none; }
   .arr-lbl { fill: #78716C; font-size: 13px; }
@@ -33,6 +34,7 @@
     .sky { stroke: #7DD3FC; } .sky-t { fill: #7DD3FC; }
     .rose { stroke: #FDA4AF; } .rose-t { fill: #FDA4AF; }
     .emerald { stroke: #6EE7B7; } .emerald-t { fill: #6EE7B7; }
+    .violet { stroke: #D8B4FE; } .violet-t { fill: #D8B4FE; }
     .card-border { stroke: #44403C; }
     .arr { stroke: #57534E; }
     .arr-lbl { fill: #78716C; }
@@ -45,11 +47,13 @@
   </marker>
 </defs>
 
+<!-- GitHub repo -->
 <rect class="card card-border" x="40" y="70" width="210" height="66" rx="10"/>
 <line class="accent-bar emerald" x1="40" y1="82" x2="40" y2="124"/>
 <text class="lbl emerald-t" x="62" y="100">GitHub repo</text>
 <text class="s card-sub" x="62" y="120">Source of truth</text>
 
+<!-- Renovate -->
 <rect class="card card-border" x="40" y="166" width="210" height="66" rx="10"/>
 <line class="accent-bar rose" x1="40" y1="178" x2="40" y2="220"/>
 <text class="lbl rose-t" x="62" y="196">Renovate</text>
@@ -63,7 +67,8 @@
 
 <line class="arr" x1="250" y1="199" x2="326" y2="199" marker-end="url(#ah)"/>
 
-<rect class="region" x="330" y="50" width="500" height="360" rx="14"/>
+<!-- k3s cluster -->
+<rect class="region" x="330" y="50" width="500" height="410" rx="14"/>
 <text class="h region-t" x="354" y="82">k3s cluster</text>
 <text class="s region-t" x="354" y="100" opacity="0.8">Pods schedule freely across both nodes · failover automatic</text>
 
@@ -75,47 +80,68 @@
 <text class="lbl amber-t" x="608" y="142">luffy</text>
 <text class="s card-sub" x="608" y="160">worker · Pi 5 · 16GB</text>
 
-<rect class="region" x="354" y="198" width="452" height="192" rx="10"/>
+<rect class="region" x="354" y="198" width="452" height="244" rx="10"/>
 <text class="s region-t" x="372" y="220" opacity="0.8">workloads</text>
 
+<!-- Apps row -->
 <rect class="card indigo" x="372" y="234" width="106" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="425" y="255" text-anchor="middle">homepage</text>
 <rect class="card indigo" x="490" y="234" width="96" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="538" y="255" text-anchor="middle">linkding</text>
 <rect class="card indigo" x="598" y="234" width="120" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="658" y="255" text-anchor="middle">audiobookshelf</text>
 <rect class="card indigo" x="730" y="234" width="58" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="759" y="255" text-anchor="middle">grafana</text>
 
-<rect class="card sky" x="372" y="280" width="102" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="423" y="301" text-anchor="middle">prometheus</text>
-<rect class="card sky" x="486" y="280" width="106" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="539" y="301" text-anchor="middle">alertmanager</text>
-<rect class="card sky" x="604" y="280" width="116" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="662" y="301" text-anchor="middle">democratic-csi</text>
-<rect class="card sky" x="732" y="280" width="56" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="760" y="301" text-anchor="middle">traefik</text>
+<!-- CNPG row -->
+<rect class="card violet" x="372" y="280" width="200" height="34" rx="7" stroke-width="1"/><text class="s violet-t" x="472" y="301" text-anchor="middle">cnpg primary (zoro)</text>
+<rect class="card violet" x="586" y="280" width="200" height="34" rx="7" stroke-width="1"/><text class="s violet-t" x="686" y="301" text-anchor="middle">cnpg replica (luffy)</text>
 
-<rect class="card emerald" x="372" y="326" width="70" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="407" y="347" text-anchor="middle">sops</text>
-<rect class="card emerald" x="454" y="326" width="110" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="509" y="347" text-anchor="middle">renovate-job</text>
+<!-- Streaming replication arrow between CNPG pods -->
+<line class="arr" x1="572" y1="297" x2="584" y2="297" marker-end="url(#ah)"/>
 
-<rect class="card card-border" x="884" y="70" width="216" height="130" rx="12"/>
-<line class="accent-bar amber" x1="884" y1="82" x2="884" y2="188"/>
+<!-- Infra row -->
+<rect class="card sky" x="372" y="326" width="102" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="423" y="347" text-anchor="middle">prometheus</text>
+<rect class="card sky" x="486" y="326" width="106" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="539" y="347" text-anchor="middle">alertmanager</text>
+<rect class="card sky" x="604" y="326" width="116" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="662" y="347" text-anchor="middle">democratic-csi</text>
+<rect class="card sky" x="732" y="326" width="56" height="34" rx="7" stroke-width="1"/><text class="s sky-t" x="760" y="347" text-anchor="middle">traefik</text>
+
+<!-- Operators row -->
+<rect class="card emerald" x="372" y="372" width="70" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="407" y="393" text-anchor="middle">sops</text>
+<rect class="card emerald" x="454" y="372" width="110" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="509" y="393" text-anchor="middle">renovate-job</text>
+<rect class="card emerald" x="576" y="372" width="100" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="626" y="393" text-anchor="middle">cnpg operator</text>
+<rect class="card emerald" x="688" y="372" width="100" height="34" rx="7" stroke-width="1"/><text class="s emerald-t" x="738" y="393" text-anchor="middle">cert-manager</text>
+
+<!-- QNAP NAS -->
+<rect class="card card-border" x="884" y="70" width="216" height="200" rx="12"/>
+<line class="accent-bar amber" x1="884" y1="82" x2="884" y2="258"/>
 <text class="lbl amber-t" x="904" y="98">QNAP NAS</text>
-<text class="s card-sub" x="904" y="126">iSCSI · config, metadata</text>
+<text class="s card-sub" x="904" y="126">iSCSI · config, metadata, db</text>
 <text class="s card-sub" x="904" y="148">NFS · audiobooks, podcasts</text>
 <text class="s card-sub" x="904" y="170">block RWO + network RWX</text>
+<text class="s card-sub" x="904" y="200" font-weight="600">Minio (Docker)</text>
+<text class="s card-sub" x="904" y="220">S3 · cnpg backups bucket</text>
+<text class="s card-sub" x="904" y="240">192.168.1.153:9000</text>
 
 <line class="arr" x1="830" y1="135" x2="882" y2="135" marker-end="url(#ah)"/>
 <text class="arr-lbl" x="856" y="127" text-anchor="middle">storage</text>
 
-<rect class="card card-border" x="354" y="446" width="280" height="130" rx="12"/>
-<line class="accent-bar sky" x1="354" y1="458" x2="354" y2="564"/>
-<text class="lbl sky-t" x="374" y="474">Networking</text>
-<text class="s card-sub" x="374" y="500">Cloudflare Tunnel</text>
-<text class="s card-sub" x="374" y="520">no open ports · public DNS</text>
-<text class="s card-sub" x="374" y="540">Tailscale · grafana on LAN</text>
+<line class="arr" x1="830" y1="220" x2="882" y2="220" marker-end="url(#ah)"/>
+<text class="arr-lbl" x="856" y="212" text-anchor="middle">WAL · backups</text>
 
-<line class="arr" x1="494" y1="410" x2="494" y2="444" marker-end="url(#ah)"/>
-<text class="arr-lbl" x="502" y="430" text-anchor="start">ingress</text>
+<!-- Networking -->
+<rect class="card card-border" x="354" y="496" width="280" height="130" rx="12"/>
+<line class="accent-bar sky" x1="354" y1="508" x2="354" y2="614"/>
+<text class="lbl sky-t" x="374" y="524">Networking</text>
+<text class="s card-sub" x="374" y="550">Cloudflare Tunnel</text>
+<text class="s card-sub" x="374" y="570">no open ports · public DNS</text>
+<text class="s card-sub" x="374" y="590">Tailscale · grafana on LAN</text>
 
-<rect class="card card-border" x="694" y="446" width="280" height="130" rx="12"/>
-<line class="accent-bar emerald" x1="694" y1="458" x2="694" y2="564"/>
-<text class="lbl emerald-t" x="714" y="500">Internet</text>
-<text class="s card-sub" x="714" y="526">homepage · links · audiobooks</text>
+<line class="arr" x1="494" y1="460" x2="494" y2="494" marker-end="url(#ah)"/>
+<text class="arr-lbl" x="502" y="480" text-anchor="start">ingress</text>
 
-<line class="arr" x1="634" y1="511" x2="692" y2="511" marker-end="url(#ah)"/>
+<!-- Internet -->
+<rect class="card card-border" x="694" y="496" width="280" height="130" rx="12"/>
+<line class="accent-bar emerald" x1="694" y1="508" x2="694" y2="614"/>
+<text class="lbl emerald-t" x="714" y="550">Internet</text>
+<text class="s card-sub" x="714" y="576">homepage · links · audiobooks</text>
+
+<line class="arr" x1="634" y1="561" x2="692" y2="561" marker-end="url(#ah)"/>
 
 </svg>
