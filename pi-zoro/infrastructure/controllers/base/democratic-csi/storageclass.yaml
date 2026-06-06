@@ -8,3 +8,7 @@ provisioner: org.democratic-csi.node-manual
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: false
+parameters:
+  fsType: ext4
+mountOptions:
+  - errors=remount-ro
