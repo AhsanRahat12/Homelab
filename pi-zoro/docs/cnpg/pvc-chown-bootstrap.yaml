@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cnpg-cluster-2
+  namespace: cnpg
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: qnap-iscsi-manual
+  volumeName: cnpg-primary-pv
+  resources:
+    requests:
+      storage: 20Gi

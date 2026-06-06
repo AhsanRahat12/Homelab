@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cnpg-chown-luffy
+  namespace: cnpg
+spec:
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: luffy
+      restartPolicy: Never
+      containers:
+      - name: chown
+        image: busybox
+        command: ["sh", "-c", "chown -R 26:26 /data && echo DONE && ls -la /data"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: cnpg-cluster-2

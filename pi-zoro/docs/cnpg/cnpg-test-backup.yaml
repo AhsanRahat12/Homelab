@@ -1,0 +1,9 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cnpg-test-backup
+  namespace: cnpg
+spec:
+  method: barmanObjectStore
+  cluster:
+    name: cnpg-cluster
