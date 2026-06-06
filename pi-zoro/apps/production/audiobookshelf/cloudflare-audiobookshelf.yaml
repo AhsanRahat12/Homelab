@@ -12,6 +12,10 @@ spec:
       labels:
         app: cloudflared
     spec:
+      securityContext:                        # ADD THIS
+        runAsNonRoot: true                    # ADD THIS
+        seccompProfile:                       # ADD THIS
+          type: RuntimeDefault                # ADD THIS
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:latest
@@ -20,6 +24,16 @@ spec:
         - --config
         - /etc/cloudflared/config/config.yaml
         - run
+        
+        securityContext:                      # ADD THIS
+          allowPrivilegeEscalation: false     # ADD THIS
+          capabilities:                       # ADD THIS
+            drop: ["ALL"]                     # ADD THIS
+          runAsNonRoot: true                  # ADD THIS
+          runAsUser: 65532                    # ADD THIS (cloudflared's built-in non-root UID)
+          seccompProfile:                     # ADD THIS
+            type: RuntimeDefault             # ADD THIS
+        
         livenessProbe:
           httpGet:
             path: /ready
