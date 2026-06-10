@@ -126,3 +126,10 @@ All three components were originally running on ephemeral emptyDir storage backe
 | Alertmanager | iSCSI LUN on QNAP | 1Gi |
 
 **Automated Updates:** Renovate runs as a Kubernetes CronJob, scanning the repo every hour and opening Pull Requests for outdated images or Helm chart versions.
+
+
+---
+
+## 🌐 Connect
+
+[LinkedIn](https://www.linkedin.com/in/rahatahsan/) &nbsp;•&nbsp; [Twitter/X](https://x.com/RahatAhsan20) &nbsp;•&nbsp; [GitHub (Main Profile)](https://github.com/AhsanRahat12) &nbsp;•&nbsp; [Medium](https://medium.com/@s.rahatahsan)

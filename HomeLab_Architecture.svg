@@ -123,7 +123,8 @@
 <text class="arr-lbl" x="856" y="127" text-anchor="middle">storage</text>
 
 <line class="arr" x1="830" y1="220" x2="882" y2="220" marker-end="url(#ah)"/>
-<text class="arr-lbl" x="856" y="212" text-anchor="middle">WAL · backups</text>
+<text class="arr-lbl" x="856" y="199" text-anchor="middle">WAL</text>
+<text class="arr-lbl" x="856" y="212" text-anchor="middle">backups</text>
 
 <!-- Networking -->
 <rect class="card card-border" x="354" y="496" width="280" height="130" rx="12"/>
