@@ -120,12 +120,13 @@
 
 <!-- Primary → Barman (WAL archiving, continuous) -->
 <line x1="240" y1="259" x2="430" y2="303" class="arr arr-blue" marker-end="url(#arrow)"/>
-<text class="tiny blue-text" x="280" y="280">WAL archive (continuous)</text>
+<text class="tiny blue-text" x="340" y="318" text-anchor="middle">WAL archive</text>
+<text class="tiny blue-text" x="340" y="330" text-anchor="middle">(continuous)</text>
 
 <!-- Replica → Barman (base backups, scheduled) -->
 <line x1="500" y1="259" x2="525" y2="303" class="arr arr-blue" marker-end="url(#arrow)"/>
 <text class="tiny blue-text" x="535" y="288">base backup</text>
-<text class="tiny blue-text" x="535" y="300">(2am daily)</text>
+<text class="tiny blue-text" x="535" y="300">(12am daily)</text>
 
 <!-- Arrow: democratic-csi → QNAP LUNs -->
 <line x1="180" y1="345" x2="180" y2="408" class="arr arr-teal" marker-end="url(#arrow)"/>
