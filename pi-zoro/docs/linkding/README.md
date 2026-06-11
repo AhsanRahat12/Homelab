@@ -5,6 +5,8 @@ Three-stage storage migration from SD card to fully automated iSCSI failover. No
 
 **Live at** [links.rahatahsan.com](https://links.rahatahsan.com)
 
+> **TL;DR:** Migrated a stateful app through three storage architectures — SD card → node-pinned static PV → fully automated iSCSI failover with no nodeSelector. Diagnosed and fixed an iSCSI volume deadlock during rolling restarts, then implemented Pod Security Admission `restricted` from the ground up.
+
 ---
 
 ## Architecture

@@ -5,6 +5,8 @@ Migrated all three components off SD cards after 28 combined pod restarts wiped 
 
 **Grafana at** [grs.rahatahsan.com](https://grs.rahatahsan.com) — LAN only, not publicly accessible
 
+> **TL;DR:** Migrated Prometheus, Grafana, and Alertmanager off SD-card storage after 28 combined restarts wiped all metrics and dashboards — moved to dedicated iSCSI LUNs, fixed root-owned volume permissions, and resolved Operator-vs-manual PVC ownership conflicts.
+
 ---
 
 ## Architecture

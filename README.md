@@ -130,6 +130,15 @@ All three components were originally running on ephemeral emptyDir storage backe
 
 ---
 
+## 🔥 Incidents & Lessons
+
+- [iSCSI session drops triggered real CNPG failover](./pi-zoro/docs/cnpg/README.md#-problems--decisions) — NIC power management bug, replica promoted automatically, zero data loss.
+- [RollingUpdate + RWO corrupted a filesystem](./pi-zoro/docs/audiobookshelf/README.md#-problems--decisions) — pod showed `1/1 Running` while dead inside; root-caused via `kubectl logs --previous` and missing liveness probes.
+- [iSCSI volume deadlock on rolling restarts](./pi-zoro/docs/linkding/README.md#-problems--decisions) — CrashLoopBackOff held the volume lock indefinitely; fixed with `strategy: Recreate`.
+- [Three-stage storage migration with zero-downtime failover](./pi-zoro/docs/linkding/README.md#-problems--decisions) — SD card → node-pinned PV → fully automated iSCSI.
+
+---
+
 ## 🌐 Connect
 
 [LinkedIn](https://www.linkedin.com/in/rahatahsan/) &nbsp;•&nbsp; [Twitter/X](https://x.com/RahatAhsan20) &nbsp;•&nbsp; [GitHub (Main Profile)](https://github.com/AhsanRahat12) &nbsp;•&nbsp; [Medium](https://medium.com/@s.rahatahsan)

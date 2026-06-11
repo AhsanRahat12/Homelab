@@ -5,6 +5,8 @@ Four volumes, two storage backends (iSCSI + NFS), tested node failover, zero dat
 
 **Live at** [audiobooks.rahatahsan.com](https://audiobooks.rahatahsan.com)
 
+> **TL;DR:** Designed a split storage architecture (iSCSI for databases, NFS for media) across two nodes with tested failover. Diagnosed and recovered from a real filesystem corruption incident caused by a RollingUpdate/RWO deadlock — including root-causing a "1/1 Running but dead inside" pod with no liveness probe.
+
 ---
 
 ## Architecture

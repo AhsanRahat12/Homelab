@@ -3,6 +3,8 @@ Two-instance HA PostgreSQL cluster deployed on Kubernetes via GitOps. Provides a
 
 Built to replace per-app SQLite databases that were one iSCSI hiccup away from corruption.
 
+> **TL;DR:** Built and operated a 2-node HA PostgreSQL cluster on Kubernetes — streaming replication, automated daily backups to S3-compatible storage, and a real failover that was triggered by an actual production incident (not a drill) and recovered with zero data loss.
+
 ---
 
 ## Architecture

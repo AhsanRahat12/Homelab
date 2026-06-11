@@ -5,6 +5,8 @@ Single pod, ConfigMap-driven config, Kubernetes API integration for live cluster
 
 **Live at** [homepage.rahatahsan.com](https://homepage.rahatahsan.com)
 
+> **TL;DR:** Built a cluster dashboard with RBAC-scoped read-only Kubernetes API access, config-as-code via ConfigMap (zero persistence), and a documented, explicit risk acceptance for one PSA gap — with the threat model spelled out.
+
 ---
 
 ## Architecture
