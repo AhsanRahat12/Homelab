@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(pi-zoro/age.agekey)",
+      "Read(**/*.agekey)",
+      "Read(**/*.sops.yaml)",
+      "Read(**/*-secret.yaml)",
+      "Read(**/tunnel-credentials-*.yaml)",
+      "Write(pi-zoro/clusters/**)",
+      "Bash(kubectl delete*)",
+      "Bash(kubectl apply* -n flux-system*)",
+      "Bash(rm -rf*)"
+    ]
+  }
+}
