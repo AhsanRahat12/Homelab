@@ -1,0 +1,28 @@
+# Age encryption key - CRITICAL, never touch
+pi-zoro/age.agekey
+*.agekey
+
+# SOPS encrypted files
+*.sops.yaml
+
+# Kubernetes secrets
+*-secret.yaml
+*secret*.yaml
+tunnel-credentials-*.yaml
+
+# Flux system - don't let Claude mess with GitOps reconciliation
+pi-zoro/clusters/
+
+# Terraform/sensitive infra state
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Generic secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/
+*credentials*
