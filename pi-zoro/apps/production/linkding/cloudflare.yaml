@@ -12,6 +12,10 @@ spec:
       labels:
         app: cloudflared
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:latest
@@ -20,6 +24,14 @@ spec:
         - --config
         - /etc/cloudflared/config/config.yaml
         - run
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+          runAsUser: 65532
+          seccompProfile:
+            type: RuntimeDefault
         livenessProbe:
           httpGet:
             path: /ready
