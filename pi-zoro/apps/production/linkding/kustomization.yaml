@@ -10,3 +10,28 @@ resources:
   - cloudflare.yaml
 patches:
   - path: patch-pvc.yaml
+  - target:
+      kind: Deployment
+      name: linkding
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 40m
+            memory: 180Mi
+          limits:
+            cpu: 200m
+            memory: 320Mi
+  - target:
+      kind: Deployment
+      name: cloudflared
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi

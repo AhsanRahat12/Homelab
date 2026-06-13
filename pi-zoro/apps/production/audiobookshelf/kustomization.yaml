@@ -15,3 +15,27 @@ patches:
   - path: patch-pvc-metadata.yaml
   - path: patch-pvc-audiobooks.yaml
   - path: patch-pvc-podcasts.yaml
+  - target:
+      kind: Deployment
+      name: audiobookshelf
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 20m
+            memory: 80Mi
+          limits:
+            memory: 160Mi
+  - target:
+      kind: Deployment
+      name: cloudflared
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi

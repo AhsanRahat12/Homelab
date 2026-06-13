@@ -6,3 +6,29 @@ resources:
   - namespace.yaml
   - homepage-cloudflare-secret.yaml
   - homepage-cloudflare.yaml
+patches:
+  - target:
+      kind: Deployment
+      name: homepage
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 50m
+            memory: 160Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+  - target:
+      kind: Deployment
+      name: cloudflared
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
