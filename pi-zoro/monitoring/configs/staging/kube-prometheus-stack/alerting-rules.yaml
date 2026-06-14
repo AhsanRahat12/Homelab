@@ -1,0 +1,222 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+
+    # -------------------------------------------------------------------------
+    # STORAGE — Critical
+    # These are the alerts that would have caught the May 2026 incident.
+    # Prometheus silently lost 40 hours of data with no alert firing.
+    # These exist so that never happens again.
+    # -------------------------------------------------------------------------
+    - name: storage.critical
+      rules:
+
+        # THE most important alert in this entire file.
+        # Checks whether Prometheus is actually writing new data to disk.
+        # prometheus_tsdb_head_max_time_seconds is the timestamp of the most
+        # recent sample written to the TSDB head block. If iSCSI goes read-only,
+        # this timestamp freezes while time() keeps advancing. The gap grows.
+        # When the gap exceeds 5 minutes and stays there for 5 minutes, this fires.
+        # This is the exact failure mode from the incident. Would have fired within
+        # 10 minutes instead of going undetected for 40 hours.
+        - alert: PrometheusDataStaleness
+          expr: (time() - prometheus_tsdb_head_max_time_seconds) > 300
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Prometheus has stopped writing data"
+            description: "Data staleness: {{ $value | humanizeDuration }}. Likely iSCSI I/O failure."
+
+        # Fires when any PVC in the entire cluster exceeds 80% capacity.
+        # Cluster-wide — catches monitoring, linkding, audiobookshelf, and any
+        # future app you add without needing to update this rule.
+        # At 80% you still have time to act — expand the LUN or lower retention.
+        # At 100% writes fail and you are back to the incident scenario.
+        - alert: PVCUsageCritical
+          expr: |
+            kubelet_volume_stats_used_bytes
+            / kubelet_volume_stats_capacity_bytes > 0.80
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} over 80% full"
+            description: "Current usage: {{ $value | humanizePercentage }}"
+
+        # Early warning before the critical threshold hits.
+        # At 60% you have plenty of runway — this is a heads up to plan ahead,
+        # not an emergency. Check retention settings and scrape target count.
+        # Cluster-wide for the same reason as PVCUsageCritical above.
+        - alert: PVCUsageWarning
+          expr: |
+            kubelet_volume_stats_used_bytes
+            / kubelet_volume_stats_capacity_bytes > 0.60
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} over 60% full — plan ahead"
+
+        # Detects a lost iSCSI session on either node in real time.
+        # This is your router restart scenario happening live.
+        # Why 3 minutes and not less: your iSCSI session recovery timeout is set
+        # to 120 seconds (Phase 0). If recovery is working, the session comes back
+        # within 2 minutes automatically. Alerting at 3 minutes means this only
+        # fires when recovery has actually failed — not on every router restart.
+        # If this fires, manual intervention is required immediately.
+        - alert: iSCSISessionLost
+          expr: node_iscsi_session_count == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "iSCSI session lost on {{ $labels.instance }}"
+            description: |
+              No active iSCSI sessions on {{ $labels.instance }}. PVC writes are failing.
+              Immediate action: kubectl delete pod prometheus-kube-prometheus-stack-prometheus-0 -n monitoring
+              Then check QNAP and iscsiadm -m session on the affected node.
+
+    # -------------------------------------------------------------------------
+    # PODS — Critical and Warning
+    # Cluster-wide — catches broken pods in every namespace including
+    # kubernetes system components, monitoring, and all your apps.
+    # -------------------------------------------------------------------------
+    - name: pods.critical
+      rules:
+
+        # A pod that restarts more than 5 times in an hour is not recovering —
+        # it is stuck in a loop. CrashLoopBackOff means Kubernetes keeps trying
+        # to restart it with exponential backoff. This alert catches that pattern
+        # early so you can investigate the root cause instead of discovering it
+        # hours later when something downstream stops working.
+        # Cluster-wide — covers kube-system, monitoring, and all app namespaces.
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total[1h]) * 3600 > 5
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} in {{ $labels.namespace }} is crash looping"
+            description: "More than 5 restarts in the last hour"
+
+        # OOMKilled means the Linux kernel killed the container because it exceeded
+        # its memory limit. The pod restarts but will OOMKill again unless you
+        # either raise the memory limit or fix what is consuming too much memory.
+        # The `unless` clause prevents this from firing repeatedly on old events —
+        # kube_pod_container_status_last_terminated_reason is sticky and stays at 1
+        # forever. Without the unless clause you get paged on pods that recovered
+        # weeks ago. This only fires while the container is not currently running.
+        - alert: PodOOMKilled
+          expr: |
+            (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1)
+            unless (kube_pod_container_status_running == 1)
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.pod }} in {{ $labels.namespace }} was OOMKilled"
+            description: "Container {{ $labels.container }} was killed due to out of memory. Check limits."
+
+        # Prometheus scrapes metrics from targets across the entire cluster.
+        # If a target goes down its metrics stop updating, dashboards go stale,
+        # and alerts based on those metrics stop working.
+        # Raised to 15 minutes to filter out transient flaps — short network
+        # blips, pod restarts during reconciliation, and rolling updates all
+        # cause brief up == 0 readings that resolve on their own.
+        # At 15 minutes something is genuinely down and worth investigating.
+        - alert: PrometheusTargetDown
+          expr: up == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Scrape target down: {{ $labels.job }}"
+            description: "Instance {{ $labels.instance }} has been unreachable for 15 minutes"
+
+    # -------------------------------------------------------------------------
+    # FLUX — Warning
+    # If Flux cannot reconcile, your Git changes are not being applied.
+    # You could push a fix and have no idea it never made it to the cluster.
+    # -------------------------------------------------------------------------
+    - name: flux.warning
+      rules:
+
+        # Catches any Flux resource (HelmRelease, Kustomization, GitRepository)
+        # that has been in a non-Ready state for more than 10 minutes.
+        # This covers failed helm upgrades, bad manifests, and source fetch errors.
+        # Check with: flux get all -A
+        - alert: FluxReconciliationFailed
+          expr: gotk_reconcile_condition{type="Ready", status="False"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.kind }} {{ $labels.name }} is not reconciling"
+            description: "Check with: flux get {{ $labels.kind }}s -A"
+
+    # -------------------------------------------------------------------------
+    # NODES — Warning
+    # Hardware-level alerts for your Raspberry Pis.
+    # These fire before the node becomes a problem, not after.
+    # -------------------------------------------------------------------------
+    - name: nodes.warning
+      rules:
+
+        # Raspberry Pis have limited RAM (4-8GB). When available memory drops
+        # below 15% the kernel starts aggressively swapping and the OOM killer
+        # becomes likely. At 15% you still have time to identify what is consuming
+        # memory and act before something gets killed.
+        - alert: NodeMemoryPressure
+          expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.15
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} memory below 15%"
+
+        # Sustained CPU above 90% on a Raspberry Pi is a problem — not because
+        # the CPU cannot handle load spikes, but because sustained high CPU
+        # combined with thermal throttling degrades everything on that node.
+        # 5 minutes sustained (not a spike) before this fires.
+        - alert: NodeCPUSustained
+          expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} CPU above 90% for 5 minutes"
+
+        # Raspberry Pis throttle the CPU when temperature exceeds ~80°C.
+        # At 75°C you are approaching that threshold. This fires early enough
+        # to check cooling before throttling actually kicks in and degrades
+        # performance across everything on that node.
+        - alert: NodeTemperatureHigh
+          expr: node_thermal_zone_temp{zone="cpu-thermal"} > 75
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} CPU temp above 75°C — throttling risk"
+
+        # The SD card on each node runs the OS. If it fills up the node cannot
+        # write logs, kubelet cannot function, and the node effectively dies.
+        # Fires at 80% so you have time to clean up before that happens.
+        # See Task 1.5 in the project doc for the cleanup procedure.
+        - alert: NodeDiskPressure
+          expr: |
+            (node_filesystem_size_bytes{mountpoint="/"}
+            - node_filesystem_free_bytes{mountpoint="/"})
+            / node_filesystem_size_bytes{mountpoint="/"} > 0.80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} root disk over 80% full"
+            description: "SD card on {{ $labels.instance }} is {{ $value | humanizePercentage }} full"
