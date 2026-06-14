@@ -178,7 +178,6 @@ To add a new app — update `services.yaml` in the ConfigMap, commit, push. Home
 
 | Item | Status |
 |------|--------|
-| Readiness probe tuning | Planned |
 | Add new apps as they're deployed | Ongoing |
 | Confirm CPU throttling resolved | Watch `container_cpu_cfs_throttled_periods_total` for 30 days post resource bump |
 
