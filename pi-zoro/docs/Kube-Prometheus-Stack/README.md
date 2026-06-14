@@ -167,8 +167,6 @@ The Slack Incoming Webhook URL is stored as a SOPS+Age encrypted Kubernetes Secr
 
 | Item | Status |
 |------|--------|
-| Resource limits | Planned — measure with Prometheus before setting |
-| Readiness and liveness probes | Planned |
 | Grafana PostgreSQL migration | Replace SQLite with PostgreSQL to eliminate corruption risk on storage interruptions. SQLite on iSCSI is fragile — one dropped connection can corrupt the database. |
 
 ---
