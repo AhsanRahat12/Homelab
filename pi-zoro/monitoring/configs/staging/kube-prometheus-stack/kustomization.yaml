@@ -6,3 +6,5 @@ resources:
   - pv-grafana.yaml
   - pv-alertmanager.yaml
   - pvc-grafana.yaml
+  - alertmanager-slack-secret.yaml
+  - alerting-rules.yaml
