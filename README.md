@@ -63,7 +63,7 @@ Homelab/
 └── pi-zoro/
     ├── apps/
     │   ├── base/          ← environment-agnostic manifests
-    │   ├── staging/       ← staging overlays — local-path storage, internal only
+    │   ├── staging/       ← staging overlays — disabled (commented out), kept for future use
     │   └── production/    ← production overlays — NAS storage, Cloudflare Tunnel
     ├── databases/         ← CNPG cluster, scheduled backups, SOPS-encrypted secrets
     ├── clusters/
@@ -74,7 +74,7 @@ Homelab/
 
 Flux watches `clusters/staging/` and follows the chain of Kustomization files down to the actual resources. All secrets are encrypted with SOPS before being committed. Each app has its own README with a detailed breakdown of decisions, problems solved, and architecture.
 
-Staging and production are separate overlays pointing at the same base. Staging uses local-path storage on the SD card — intentionally kept simple for contrast. Production uses NAS-backed storage with no nodeSelector — pods run on either node and storage follows automatically.
+Staging and production were separate overlays pointing at the same base — staging used local-path storage on the SD card, intentionally kept simple for contrast. Staging has since been disabled (running both prod and staging on a single Pi was overkill); the overlays are commented out and `prune: true` removed the staging namespaces from the cluster, but the framework is left in place to re-enable for experimental testing later. Production uses NAS-backed storage with no nodeSelector — pods run on either node and storage follows automatically.
 
 ---
 
@@ -83,17 +83,17 @@ Staging and production are separate overlays pointing at the same base. Staging 
 ### 🔖 [Linkding](./pi-zoro/docs/linkding/README.md)
 Self-hosted bookmark manager. Accessible at `links.rahatahsan.com` via Cloudflare Tunnel.
 
-Storage went through three stages — SD card → static iSCSI PV pinned to Zoro → democratic-csi managed iSCSI with no nodeSelector. Production data lives on a QNAP iSCSI LUN. Pod runs on either node, failover tested and proven. Migration to CNPG PostgreSQL backend planned.
+Storage went through three stages — SD card → static iSCSI PV pinned to Zoro → democratic-csi managed iSCSI with no nodeSelector. Production data lives on a QNAP iSCSI LUN. Pod runs on either node, failover tested and proven. CPU/memory requests and limits sized from 30 days of Prometheus data. Migration to CNPG PostgreSQL backend planned.
 
 ### 📚 [Audiobookshelf](./pi-zoro/docs/audiobookshelf/README.md)
 Self-hosted audiobook and podcast server. Accessible at `audiobooks.rahatahsan.com` via Cloudflare Tunnel.
 
-Four volumes with a deliberate storage split — config and metadata on iSCSI LUNs (democratic-csi, block storage, RWO), audiobooks and podcasts on NFS shares (RWX, mounts on any node with no detach needed). Zero volumes on SD card in production. Full failover tested and proven.
+Four volumes with a deliberate storage split — config and metadata on iSCSI LUNs (democratic-csi, block storage, RWO), audiobooks and podcasts on NFS shares (RWX, mounts on any node with no detach needed). Zero volumes on SD card in production. Full failover tested and proven. CPU/memory requests and limits sized from 30 days of Prometheus data — including a recurring ~1 core startup spike that informed the decision to leave CPU uncapped.
 
 ### 🏠 [Homepage](./pi-zoro/docs/homepage/README.md)
 Cluster startpage and app dashboard. Accessible at `homepage.rahatahsan.com` via Cloudflare Tunnel.
 
-Single pod, no persistence — config lives entirely in Git via ConfigMap. Integrates with the Kubernetes API via a dedicated ClusterRole to display live cluster metrics, node CPU and memory, and pod counts. All apps in the cluster are linked from a single dashboard. PSA baseline enforced on the namespace, restricted audited.
+Single pod, no persistence — config lives entirely in Git via ConfigMap. Integrates with the Kubernetes API via a dedicated ClusterRole to display live cluster metrics, node CPU and memory, and pod counts. All apps in the cluster are linked from a single dashboard. PSA baseline enforced on the namespace, restricted audited. CPU limit raised from 200m to 500m after Prometheus showed thousands of CFS-throttled periods from bursty dashboard loads.
 
 ---
 
@@ -119,6 +119,8 @@ Full observability stack — Prometheus for metrics collection, Grafana for dash
 
 All three components were originally running on ephemeral emptyDir storage backed by SD cards — Prometheus TSDB is one of the worst workloads for SD card longevity, and every pod restart wiped all history. Migrated all three to dedicated iSCSI LUNs on QNAP via democratic-csi. Metrics and dashboards now survive restarts and redeployments. Write pressure is off the SD cards.
 
+A full alerting suite was added on top — 11 PrometheusRule alerts covering storage staleness, PVC capacity, crash-looping pods, node pressure, and Flux reconciliation failures, routed through Alertmanager to a dedicated Slack channel via an encrypted webhook secret. End-to-end pipeline verified: a manual test alert reached Slack within 30 seconds.
+
 | Component | Storage | Size |
 |-----------|---------|------|
 | Prometheus | iSCSI LUN on QNAP | 10Gi |
@@ -132,10 +134,13 @@ All three components were originally running on ephemeral emptyDir storage backe
 
 ## 🔥 Incidents & Lessons
 
-- [iSCSI session drops triggered real CNPG failover](./pi-zoro/docs/cnpg/README.md#-problems--decisions) — NIC power management bug, replica promoted automatically, zero data loss.
-- [RollingUpdate + RWO corrupted a filesystem](./pi-zoro/docs/audiobookshelf/README.md#-problems--decisions) — pod showed `1/1 Running` while dead inside; root-caused via `kubectl logs --previous` and missing liveness probes.
-- [iSCSI volume deadlock on rolling restarts](./pi-zoro/docs/linkding/README.md#-problems--decisions) — CrashLoopBackOff held the volume lock indefinitely; fixed with `strategy: Recreate`.
-- [Three-stage storage migration with zero-downtime failover](./pi-zoro/docs/linkding/README.md#-problems--decisions) — SD card → node-pinned PV → fully automated iSCSI.
+- [iSCSI session drops triggered real CNPG failover](./pi-zoro/docs/cnpg/README.md#-key-engineering-decisions) — NIC power management bug, replica promoted automatically, zero data loss.
+- [RollingUpdate + RWO corrupted a filesystem](./pi-zoro/docs/audiobookshelf/README.md#-key-engineering-decisions) — pod showed `1/1 Running` while dead inside; root-caused via `kubectl logs --previous` and missing liveness probes.
+- [iSCSI volume deadlock on rolling restarts](./pi-zoro/docs/linkding/README.md#-key-engineering-decisions) — CrashLoopBackOff held the volume lock indefinitely; fixed with `strategy: Recreate`.
+- [Three-stage storage migration with zero-downtime failover](./pi-zoro/docs/linkding/README.md#-key-engineering-decisions) — SD card → node-pinned PV → fully automated iSCSI.
+- [Secret encrypted with the wrong SOPS Age key](./pi-zoro/docs/Kube-Prometheus-Stack/README.md#-key-engineering-decisions) — Flux decrypts with a different key than local SOPS; secret had to be deleted and re-encrypted with the cluster's key.
+- [Alertmanager stuck in `Init:0/1` on an RWO volume multi-attach](./pi-zoro/docs/Kube-Prometheus-Stack/README.md#-key-engineering-decisions) — scaling and force-deleting the pod didn't help; fixed by deleting the stuck `VolumeAttachment` object directly.
+- [A resource patch silently surfaced a year-old PodSecurity gap](./pi-zoro/docs/linkding/README.md#-key-engineering-decisions) — bumping cloudflared's pod template hash triggered a rollout that the `restricted` namespace rejected; the old pod had been grandfathered in since before PSA enforcement.
 
 ---
 

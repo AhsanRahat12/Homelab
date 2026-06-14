@@ -7,6 +7,8 @@ Single pod, ConfigMap-driven config, Kubernetes API integration for live cluster
 
 > **TL;DR:** Built a cluster dashboard with RBAC-scoped read-only Kubernetes API access, config-as-code via ConfigMap (zero persistence), and a documented, explicit risk acceptance for one PSA gap — with the threat model spelled out.
 
+![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s-326CE5) ![Flux](https://img.shields.io/badge/Flux-GitOps-5468FF) ![SOPS](https://img.shields.io/badge/SOPS-Age%20Encrypted-FFB000) ![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-F38020) ![RBAC](https://img.shields.io/badge/RBAC-Read--Only-2EA44F) ![Renovate](https://img.shields.io/badge/Renovate-Automated%20Updates-1A1F6C)
+
 ---
 
 ## Architecture
@@ -21,13 +23,11 @@ Single pod, ConfigMap-driven config, Kubernetes API integration for live cluster
 
 | Concern | Solution |
 |---------|----------|
-| Deployment | Flux GitOps — no manual `kubectl apply` |
-| Secrets | SOPS + Age encryption, safe to store in public Git |
 | Config | Kubernetes ConfigMap — all YAML config lives in Git, no persistence needed |
-| External access | Cloudflare Tunnel → [homepage.rahatahsan.com](https://homepage.rahatahsan.com) — no open ports or port forwarding (production only) |
+| External access | Cloudflare Tunnel → [homepage.rahatahsan.com](https://homepage.rahatahsan.com) — no open ports |
 | Cluster integration | ClusterRole + ClusterRoleBinding — read-only access to cluster API for live metrics |
-| Image updates | Renovate CronJob — automated PRs on new releases |
-| Security | PSA baseline enforced, restricted audited, non-root (UID 1000), capabilities dropped, seccomp RuntimeDefault |
+| Security | PSA baseline enforced, restricted audited — non-root, capabilities dropped, seccomp |
+| Resources | App + cloudflared requests/limits tuned from 30 days of Prometheus data |
 
 ---
 
@@ -122,23 +122,30 @@ ClusterRole and ClusterRoleBinding are cluster-wide. Don't deploy a second insta
 
 ---
 
-## 🧠 Problems & Decisions
+## 🧠 Key Engineering Decisions
 
-**No persistence needed.** Config lives entirely in Git via ConfigMap. If the pod dies and restarts it reads the ConfigMap and comes back exactly as it was. Using a PV for config would create two sources of truth — Git and the PV — that would drift over time. `emptyDir` for logs is intentional and ephemeral. Prometheus/Grafana handles real observability.
+**proxmox.yaml crash on first deploy.** Homepage v1.13.1 added `proxmox.yaml` as a required config file not documented in the upstream installation guide. At startup it tried to copy the skeleton file into `/app/config`, but subPath ConfigMap mounts make the directory non-writable. The copy failed with `EACCES: permission denied`, the pod crashed, and the liveness probe timed out — surfacing as a bad gateway. Diagnosed via `kubectl logs --previous`. Fixed by adding `proxmox.yaml: ""` to the ConfigMap and a matching volumeMount — homepage sees the file already exists and skips the copy.
 
-**Dropped the legacy Secret resource from upstream docs.** The official Kubernetes installation docs include a `Secret` of type `kubernetes.io/service-account-token`. That's a Kubernetes <1.24 pattern for manually creating service account tokens. Modern clusters auto-create them. Including it creates a redundant long-lived token — a security regression.
+**Resource limits raised after finding hidden CPU throttling — June 2026.** This was the only one of the three apps with existing `resources` (request 50m/128Mi, limit 200m/256Mi). 30 days of Prometheus data showed **562–3378 CPU-throttled periods** across sampled pod generations, despite tiny average CPU usage (0.0008–0.03 cores) — bursty short-lived spikes (dashboard load fetching from multiple widget sources) were exceeding the 200m limit even though the average looked idle. CFS throttling penalises bursts regardless of average usage. Live memory usage (~152MB) was also already above the old 128Mi request. Raised CPU limit 200m → 500m (sized as "clearly insufficient at 200m, give a substantial multiple" — the actual burst peak wasn't captured directly) and memory request 128Mi → 160Mi; memory limit and CPU request were left unchanged with existing headroom. Applied via `op: replace` since (unlike linkding/audiobookshelf) this deployment already had a `resources` block.
 
-**Pinned image instead of `latest`.** Upstream docs use `latest`. In GitOps, `latest` means Flux has no idea what's actually running and can't detect drift. Pinned to `v1.13.1`. Renovate handles upgrades automatically.
+**PSA gap documented, not silently ignored** — see the Security section above: `readOnlyRootFilesystem: false` is required for homepage's Next.js cache, with the threat model spelled out explicitly rather than left as an unexplained exception.
 
-**proxmox.yaml crash on first deploy.** Homepage v1.13.1 added `proxmox.yaml` as a required config file not documented in the upstream installation guide. At startup it tried to copy the skeleton file into `/app/config`, but subPath ConfigMap mounts make the directory non-writable. The copy failed with `EACCES: permission denied`, the pod crashed, and the liveness probe timed out — surfacing as a bad gateway.
+<details>
+<summary><strong>Additional implementation notes</strong></summary>
 
-Diagnosed via `kubectl logs --previous`. Fixed by adding `proxmox.yaml: ""` to the ConfigMap and a corresponding volumeMount in the deployment. Homepage sees the file already exists and skips the copy.
+**No persistence needed.** Config lives entirely in Git via ConfigMap. Using a PV for config would create two sources of truth that drift over time. `emptyDir` for logs is intentional and ephemeral.
 
-**Local DNS SERVFAIL during debugging.** `dig homepage.rahatahsan.com` returned SERVFAIL. Local DNS was going through Tailscale (`100.100.100.100`) which couldn't resolve public DNS. Not a real problem. Use `dig homepage.rahatahsan.com @1.1.1.1` to bypass local DNS when debugging.
+**Dropped the legacy Secret resource from upstream docs.** The official install docs include a `kubernetes.io/service-account-token` Secret — a pre-1.24 pattern modern clusters auto-create. Including it would create a redundant long-lived token.
 
-**App discovery is manual, not automatic.** Homepage supports automatic service discovery via Ingress annotations. This cluster uses Cloudflare Tunnels — there are no Ingress objects to annotate. All apps are listed manually in `services.yaml` inside the ConfigMap.
+**Pinned image instead of `latest`.** Upstream docs use `latest`. In GitOps, `latest` means Flux can't detect drift. Pinned to `v1.13.1`; Renovate handles upgrades automatically.
 
-**PSA cannot be `restricted` due to internal cache writes.** Homepage writes a Next.js cache to its own filesystem at runtime. `readOnlyRootFilesystem: true` crashes the app immediately. Baseline is enforced instead. This is the only PSA gap and is acceptable for a dashboard with no sensitive data.
+**Local DNS SERVFAIL during debugging.** `dig homepage.rahatahsan.com` returned SERVFAIL — local DNS was going through Tailscale (`100.100.100.100`) which couldn't resolve public DNS. Use `dig ... @1.1.1.1` to bypass when debugging.
+
+**App discovery is manual, not automatic.** Homepage supports service discovery via Ingress annotations, but this cluster uses Cloudflare Tunnels with no Ingress objects. All apps are listed manually in `services.yaml`.
+
+**cloudflared sidecar** got resources for the first time: requests 10m/32Mi, limit 64Mi memory — same small, stable footprint observed across all three apps' tunnels.
+
+</details>
 
 ---
 
@@ -173,6 +180,7 @@ To add a new app — update `services.yaml` in the ConfigMap, commit, push. Home
 |------|--------|
 | Readiness probe tuning | Planned |
 | Add new apps as they're deployed | Ongoing |
+| Confirm CPU throttling resolved | Watch `container_cpu_cfs_throttled_periods_total` for 30 days post resource bump |
 
 ---
 

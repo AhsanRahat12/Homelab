@@ -7,6 +7,8 @@ Three-stage storage migration from SD card to fully automated iSCSI failover. No
 
 > **TL;DR:** Migrated a stateful app through three storage architectures — SD card → node-pinned static PV → fully automated iSCSI failover with no nodeSelector. Diagnosed and fixed an iSCSI volume deadlock during rolling restarts, then implemented Pod Security Admission `restricted` from the ground up.
 
+![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s-326CE5) ![Flux](https://img.shields.io/badge/Flux-GitOps-5468FF) ![SOPS](https://img.shields.io/badge/SOPS-Age%20Encrypted-FFB000) ![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-F38020) ![PSA](https://img.shields.io/badge/PodSecurity-Restricted-CC0000) ![Renovate](https://img.shields.io/badge/Renovate-Automated%20Updates-1A1F6C)
+
 ---
 
 ## Architecture
@@ -21,17 +23,11 @@ Three-stage storage migration from SD card to fully automated iSCSI failover. No
 
 | Concern | Solution |
 |---------|----------|
-| Deployment | Flux GitOps — no manual `kubectl apply` |
-| Secrets | SOPS + Age encryption, safe to store in public Git |
-| Storage (staging) | local-path PVC — 200Mi, SD card constrained, intentional |
-| Storage (production) | democratic-csi → iSCSI LUN on QNAP NAS — 1Gi Thick provisioned, data off the Pi entirely |
-| CSI Driver | democratic-csi node-manual — handles iSCSI attach/detach between nodes automatically |
-| External access | Cloudflare Tunnel → [links.rahatahsan.com](https://links.rahatahsan.com) — no open ports or port forwarding (production only) |
-| Local access | Traefik Ingress + Cloudflare DNS A record pointing to cluster LAN IP — resolves internally, not reachable externally |
-| Image updates | Renovate CronJob — automated PRs on new releases |
-| Security | PSA restricted enforced, non-root (UID 33), capabilities dropped, seccomp RuntimeDefault, read-only filesystem |
-| Deploy strategy | `Recreate` — RWO iSCSI volume requires single-pod exclusive access, RollingUpdate causes deadlock |
-| Health checks | Readiness + liveness probes on `/health` port 9090 |
+| Storage | democratic-csi → iSCSI LUN on QNAP, no nodeSelector — pod runs on either node, storage follows |
+| External access | Cloudflare Tunnel → [links.rahatahsan.com](https://links.rahatahsan.com) — no open ports |
+| Security | PSA `restricted` enforced — non-root, capabilities dropped, seccomp, read-only filesystem |
+| Deploy strategy | `Recreate` — RWO iSCSI requires single-pod exclusive access, RollingUpdate causes deadlock |
+| Health checks & resources | Readiness/liveness probes on `/health`; CPU/memory requests and limits tuned from 30 days of Prometheus data |
 
 ---
 
@@ -108,17 +104,9 @@ spec:
 
 ---
 
-## 🧠 Problems & Decisions
-
-**Container ran as root.** Applied `runAsUser`, `runAsGroup`, and `fsGroup: 33` (www-data) at the pod level. `fsGroup` was the critical one — without it the mounted volume wasn't writable despite running as the correct user.
-
-**Secrets in Git.** Kubernetes secrets are base64, not encrypted. Chose SOPS + Age for Flux's native integration — Flux decrypts at deploy time, the private key never touches the repo.
-
-**Admin user bootstrapping.** Injected `LD_SUPERUSER_NAME` and `LD_SUPERUSER_PASSWORD` via encrypted secret and `envFrom.secretRef` to eliminate manual `createsuperuser` after every deploy.
+## 🧠 Key Engineering Decisions
 
 **Storage evolution — three stages to get it right.**
-
-The storage architecture for linkding went through three distinct stages, each solving a problem the previous stage introduced:
 
 ```
 Stage 1 — local-path (SD card)
@@ -128,33 +116,48 @@ Stage 1 — local-path (SD card)
 
 Stage 2 — Static PV + manual iSCSI mount (node affinity)
   Data moved off the Pi to QNAP NAS via iSCSI LUN
-  LUN manually mounted on Zoro via fstab
-  Static PV with nodeSelector: zoro
-  Problem: pod is now pinned to Zoro
-  Zoro goes down → linkding goes down, no recovery possible
+  LUN manually mounted on Zoro via fstab, static PV with nodeSelector: zoro
+  Problem: pod is pinned to Zoro — if Zoro goes down, linkding goes down
 
 Stage 3 — democratic-csi (current)
   Data still on QNAP NAS via iSCSI LUN
   democratic-csi manages the full attach/detach lifecycle
   No nodeSelector — pod runs on either Zoro or Luffy
-  Node failure is now survivable — pod reschedules, LUN follows
+  Node failure is now survivable — pod reschedules, LUN follows automatically
 ```
 
-**Why democratic-csi instead of a static PV.** A static PV with a local hostPath mount required a `nodeSelector` pinning the pod to Zoro. If Zoro went down, linkding went down with it — no recovery possible. democratic-csi manages the full iSCSI attach/detach lifecycle, removing the nodeSelector entirely. The pod now runs on whichever node Kubernetes picks. If Zoro fails, democratic-csi detaches the LUN from Zoro and reattaches to Luffy automatically.
+**iSCSI volume deadlock during rolling restarts.** The PVC is `ReadWriteOnce` on iSCSI — only one pod can hold the volume attachment at a time. During a rolling restart the old crashing pod kept the iSCSI lock — it was in CrashLoopBackOff, so Kubernetes kept restarting it before it fully released the attachment. The new pod got stuck in `ContainerCreating` indefinitely. Force-deleting the old pod didn't help — the ReplicaSet immediately spawned a replacement which claimed the lock again. Fix: scale to zero, wait for democratic-csi to complete the detach, scale back to one. This is what eventually drove `strategy: Recreate` for this deployment.
+
+**Implementing Pod Security Admission `restricted`.** Started with `warn` mode so violations surfaced without breaking the running pod. Three gaps were found: unnecessary Linux capabilities, `runAsNonRoot` not set despite a non-root user being configured, and no `seccompProfile`. Making the filesystem read-only also crashed the app — linkding writes pid files and temp data at startup. Fixed with a small `emptyDir` at `/tmp`. Once the pod ran clean with zero warnings, the namespace was flipped from `warn` to `enforce`.
+
+**A resource patch silently surfaced a year-old PodSecurity gap — June 2026.** Adding resource limits to `cloudflared` changed its pod template hash and triggered a rollout. The new ReplicaSet couldn't create pods: `FailedCreate: violates PodSecurity "restricted:latest"` — missing `allowPrivilegeEscalation: false`, capability drops, `runAsNonRoot`, and `seccompProfile`. The *old* pod (61 days old, 16 restarts) kept serving traffic because PodSecurity admission only checks pods at *creation* time — it had been grandfathered in since before the namespace enforced `restricted`. Root cause: `cloudflare.yaml` for linkding had never had a `securityContext` defined, unlike the other two apps' tunnel manifests. Fixed by adding the same restricted-compliant securityContext used elsewhere; the new ReplicaSet came up `2/2` immediately and the old one scaled to 0.
+
+<details>
+<summary><strong>Additional implementation notes</strong></summary>
+
+**Container ran as root.** Applied `runAsUser`, `runAsGroup`, and `fsGroup: 33` (www-data) at the pod level. `fsGroup` was the critical one — without it the mounted volume wasn't writable despite running as the correct user.
+
+**Secrets in Git.** Kubernetes secrets are base64, not encrypted. Chose SOPS + Age for Flux's native integration — Flux decrypts at deploy time, the private key never touches the repo.
+
+**Admin user bootstrapping.** Injected `LD_SUPERUSER_NAME` and `LD_SUPERUSER_PASSWORD` via encrypted secret and `envFrom.secretRef` to eliminate manual `createsuperuser` after every deploy.
 
 **Live data migration.** Scaled staging to 0 to stop writes, ran a migration pod mounting both the old hostPath and new iSCSI PVC simultaneously, copied data with `rsync -av`. Cross-namespace PVC limitation meant PVCs couldn't be mounted directly — used hostPath volumes pointing at the underlying filesystem paths instead.
 
-**Cloudflare tunnel conflict.** One tunnel, two environments trying to claim it. Scaled staging Cloudflare to 0, deployed production pointing at the full cluster DNS (`linkding.linkding-prod.svc.cluster.local:9090`), removed Cloudflare from staging. Staging is now internal only via port-forward.
+**Cloudflare tunnel conflict.** One tunnel, two environments trying to claim it. Scaled staging Cloudflare to 0, deployed production pointing at the full cluster DNS (`linkding.linkding-prod.svc.cluster.local:9090`), removed Cloudflare from staging.
 
 **Base PVC size.** Reduced to 200Mi — production data lives on QNAP, SD card space is limited. Production patches up to 1Gi via `patch-pvc.yaml`.
 
-**iSCSI volume deadlock during rolling restarts.** Because the PVC is `ReadWriteOnce` on iSCSI, only one pod can hold the volume attachment at a time. During a rolling restart the old crashing pod kept the iSCSI lock — it was in CrashLoopBackOff, meaning Kubernetes kept restarting it before it fully released the attachment. The new pod got stuck in `ContainerCreating` indefinitely waiting for the volume to detach. Force deleting the old pod didn't help — the ReplicaSet immediately spawned a replacement which claimed the lock again. Fix: scale the deployment to zero to fully release the iSCSI attachment, wait for democratic-csi to complete the detach, then scale back to one. This came up twice — once when fixing the security context, once when flipping to enforce.
+**Readiness and liveness probes added — June 2026.** Linkding exposes `/health` on port 9090 — confirmed against the live pod, returns `{"version": "1.45.0", "status": "healthy"}`. Startup confirmed at ~7s from timestamped logs. No startupProbe needed. Readiness at 10s, liveness at 40s — readiness always fires first (golden rule). Liveness period kept at 30s to avoid aggressive restarts on a stateful SQLite app.
 
-**Implementing Pod Security Admission.** Started with `warn` mode so Kubernetes would flag problems without breaking anything. Three things were missing: the container still had Linux kernel capabilities it didn't need, `runAsNonRoot` wasn't set even though a non-root user was configured, and no syscall restrictions were in place. Each was added and the pod was tested after each change. Making the filesystem read-only caused a crash — linkding needs to write temporary files at startup and had nowhere to do it. Fixed by giving it a small writable directory in memory via `emptyDir`. Once everything was clean, the namespace was locked down to `enforce` — any pod that doesn't meet the standard is now rejected before it runs.
+**Resource requests/limits added — June 2026.** Sized from 30 days of `container_memory_working_set_bytes` and `container_cpu_usage_seconds_total` in Prometheus, cross-checked against `kubectl get pods/rs` to separate the current pod from stale historical ReplicaSets. Current pod ran ~166–172MB / ~0.036 cores; a previous generation peaked at ~204MB on the same shape of workload — used as the sizing ceiling. Zero OOM events recorded; there was no existing limit, so this was sizing from scratch.
 
-**Recreate strategy added — June 2026.** RWO iSCSI volume means only one pod can hold the attachment at a time. RollingUpdate tries to bring the new pod up before killing the old one — guaranteed deadlock on every deploy. `strategy: Recreate` added explicitly. Will be revisited when CNPG migration lands and the storage architecture changes.
+- **Memory:** request 180Mi, limit 320Mi (204MB ceiling + ~50% headroom).
+- **CPU:** limit 200m (~5x the observed ~0.036-core peak) — unlike audiobookshelf, linkding has no extreme startup spike, so a real limit was set.
+- **cloudflared sidecar:** requests 10m/32Mi, limit 64Mi memory.
 
-**Readiness and liveness probes added — June 2026.** Linkding exposes `/health` on port 9090 — confirmed against the live pod, returns `{"version": "1.45.0", "status": "healthy"}`. Startup confirmed at ~7s from timestamped logs. No startupProbe needed. Readiness at 10s, liveness at 40s — readiness always fires first (golden rule). Liveness period kept at 30s to avoid aggressive restarts on a stateful SQLite app. Detection: readiness 30s, liveness 90s worst case.
+Applied via Kustomize JSON6902 `op: add` patches (the base deployment had no existing `resources` field).
+
+</details>
 
 ---
 
@@ -176,7 +179,6 @@ Staging intentionally kept on local-path — no failover, no democratic-csi. The
 
 | Item | Status |
 |------|--------|
-| Resource limits | Planned — measure with Prometheus before setting |
 | PostgreSQL backend | Replace SQLite with PostgreSQL via CloudNative PG. Enables stateless pods, horizontal scaling, and cleaner failover. Next major architectural change. |
 
 ---
