@@ -16,6 +16,11 @@ patches:
       name: linkding
     patch: |-
       - op: add
+        path: /spec/template/spec/containers/0/envFrom/-
+        value:
+          secretRef:
+            name: linkding-db-secret
+      - op: add
         path: /spec/template/spec/containers/0/resources
         value:
           requests:
