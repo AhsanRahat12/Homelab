@@ -6,6 +6,7 @@ resources:
   - namespace.yaml
   - pv.yaml
   - linkding-container-env-secret.yaml
+  - linkding-db-secret.yaml
   - cloudflare-secret.yaml
   - cloudflare.yaml
 patches:
