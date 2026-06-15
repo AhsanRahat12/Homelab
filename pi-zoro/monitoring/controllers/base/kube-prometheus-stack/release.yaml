@@ -47,6 +47,18 @@ spec:
         enabled: true
         existingClaim: grafana-data-pvc
     # -------------------------
+    # K3S — Disable embedded component scraping
+    # These components are embedded in the k3s binary and do not expose
+    # standard Prometheus endpoints. Disabling permanently removes the
+    # false positive alerts that fire every hour on K3s clusters.
+    # -------------------------
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
+    # -------------------------
     # PROMETHEUS
     # -------------------------
     prometheus:
