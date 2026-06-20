@@ -21,22 +21,6 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-        - name: fix-data-permissions
-          image: busybox:1.37.0
-          command: ["sh", "-c", "chown 1000:1000 /data"]
-          securityContext:
-            runAsUser: 0
-            runAsNonRoot: false
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-              add:
-                - CHOWN
-          volumeMounts:
-            - mountPath: /data
-              name: actual-budget-data
       containers:
         - name: actual-budget
           image: actualbudget/actual-server:25.6.1
