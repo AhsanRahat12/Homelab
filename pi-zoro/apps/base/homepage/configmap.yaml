@@ -29,6 +29,10 @@ data:
             href: https://links.rahatahsan.com
             description: Bookmark manager
             icon: linkding.png
+        - Actual Budget:
+            href: https://budget.rahatahsan.com
+            description: Personal finance
+            icon: actual-budget.png
     - Monitoring:
         - Grafana:
             href: https://grs.rahatahsan.com
