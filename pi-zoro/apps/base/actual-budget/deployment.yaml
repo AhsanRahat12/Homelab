@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: actual-budget
-          image: actualbudget/actual-server:25.12.0
+          image: actualbudget/actual-server:26.6.0
           envFrom:
             - secretRef:
                 name: actual-budget-env
