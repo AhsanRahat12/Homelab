@@ -32,7 +32,7 @@ data:
         - Actual Budget:
             href: https://budget.rahatahsan.com
             description: Personal finance
-            icon: actual-budget.png
+            icon: mdi-cash-multiple
     - Monitoring:
         - Grafana:
             href: https://grs.rahatahsan.com
