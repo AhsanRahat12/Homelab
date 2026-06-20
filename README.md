@@ -90,6 +90,11 @@ Self-hosted audiobook and podcast server. Accessible at `audiobooks.rahatahsan.c
 
 Four volumes with a deliberate storage split — config and metadata on iSCSI LUNs (democratic-csi, block storage, RWO), audiobooks and podcasts on NFS shares (RWX, mounts on any node with no detach needed). Zero volumes on SD card in production. Full failover tested and proven. CPU/memory requests and limits sized from 30 days of Prometheus data — including a recurring ~1 core startup spike that informed the decision to leave CPU uncapped.
 
+### 💰 [Actual Budget](./pi-zoro/docs/actual-budget/README.md)
+Self-hosted personal finance app using envelope budgeting. Accessible at `budget.rahatahsan.com` via Cloudflare Tunnel.
+
+Single iSCSI LUN for persistent SQLite data, no PostgreSQL dependency. Deployed non-root with PSA `restricted` from day one — discovered that fresh iSCSI LUNs format as `root:root`, requiring a one-time root initContainer to bootstrap volume permissions before the namespace was locked back to `restricted`. Full fix procedure documented for future LUN replacements.
+
 ### 🏠 [Homepage](./pi-zoro/docs/homepage/README.md)
 Cluster startpage and app dashboard. Accessible at `homepage.rahatahsan.com` via Cloudflare Tunnel.
 
@@ -141,6 +146,7 @@ A full alerting suite was added on top — 11 PrometheusRule alerts covering sto
 - [Secret encrypted with the wrong SOPS Age key](./pi-zoro/docs/Kube-Prometheus-Stack/README.md#-key-engineering-decisions) — Flux decrypts with a different key than local SOPS; secret had to be deleted and re-encrypted with the cluster's key.
 - [Alertmanager stuck in `Init:0/1` on an RWO volume multi-attach](./pi-zoro/docs/Kube-Prometheus-Stack/README.md#-key-engineering-decisions) — scaling and force-deleting the pod didn't help; fixed by deleting the stuck `VolumeAttachment` object directly.
 - [A resource patch silently surfaced a year-old PodSecurity gap](./pi-zoro/docs/linkding/README.md#-key-engineering-decisions) — bumping cloudflared's pod template hash triggered a rollout that the `restricted` namespace rejected; the old pod had been grandfathered in since before PSA enforcement.
+- [Fresh iSCSI LUN formatted root:root blocked non-root writes](./pi-zoro/docs/actual-budget/README.md#-key-engineering-decisions) — Kubernetes `fsGroup` changes group ownership but not user ownership; a non-root container couldn't mkdir on the volume root. Temporarily relaxed namespace PSA to `baseline` for a one-time root initContainer chown, then restored to `restricted`.
 
 ---
 
