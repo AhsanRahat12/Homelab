@@ -84,10 +84,11 @@
 <text class="s region-t" x="372" y="220" opacity="0.8">workloads</text>
 
 <!-- Apps row -->
-<rect class="card indigo" x="372" y="234" width="106" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="425" y="255" text-anchor="middle">homepage</text>
-<rect class="card indigo" x="490" y="234" width="96" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="538" y="255" text-anchor="middle">linkding</text>
-<rect class="card indigo" x="598" y="234" width="120" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="658" y="255" text-anchor="middle">audiobookshelf</text>
-<rect class="card indigo" x="730" y="234" width="58" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="759" y="255" text-anchor="middle">grafana</text>
+<rect class="card indigo" x="372" y="234" width="88" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="416" y="255" text-anchor="middle">homepage</text>
+<rect class="card indigo" x="468" y="234" width="78" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="507" y="255" text-anchor="middle">linkding</text>
+<rect class="card indigo" x="554" y="234" width="110" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="609" y="255" text-anchor="middle">audiobookshelf</text>
+<rect class="card indigo" x="672" y="234" width="56" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="700" y="255" text-anchor="middle">grafana</text>
+<rect class="card indigo" x="736" y="234" width="60" height="34" rx="7" stroke-width="1"/><text class="s indigo-t" x="766" y="255" text-anchor="middle">budget</text>
 
 <!-- CNPG row -->
 <rect class="card violet" x="372" y="280" width="200" height="34" rx="7" stroke-width="1"/><text class="s violet-t" x="472" y="301" text-anchor="middle">cnpg primary (zoro)</text>
@@ -141,7 +142,8 @@
 <rect class="card card-border" x="694" y="496" width="280" height="130" rx="12"/>
 <line class="accent-bar emerald" x1="694" y1="508" x2="694" y2="614"/>
 <text class="lbl emerald-t" x="714" y="550">Internet</text>
-<text class="s card-sub" x="714" y="576">homepage · links · audiobooks</text>
+<text class="s card-sub" x="714" y="568">homepage · links · audiobooks</text>
+<text class="s card-sub" x="714" y="588">budget</text>
 
 <line class="arr" x1="634" y1="561" x2="692" y2="561" marker-end="url(#ah)"/>
 
