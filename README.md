@@ -147,6 +147,7 @@ A full alerting suite was added on top — 11 PrometheusRule alerts covering sto
 - [Alertmanager stuck in `Init:0/1` on an RWO volume multi-attach](./pi-zoro/docs/Kube-Prometheus-Stack/README.md#-key-engineering-decisions) — scaling and force-deleting the pod didn't help; fixed by deleting the stuck `VolumeAttachment` object directly.
 - [A resource patch silently surfaced a year-old PodSecurity gap](./pi-zoro/docs/linkding/README.md#-key-engineering-decisions) — bumping cloudflared's pod template hash triggered a rollout that the `restricted` namespace rejected; the old pod had been grandfathered in since before PSA enforcement.
 - [Fresh iSCSI LUN formatted root:root blocked non-root writes](./pi-zoro/docs/actual-budget/README.md#-key-engineering-decisions) — Kubernetes `fsGroup` changes group ownership but not user ownership; a non-root container couldn't mkdir on the volume root. Temporarily relaxed namespace PSA to `baseline` for a one-time root initContainer chown, then restored to `restricted`.
+- [A stuck CNPG primary went undetected for 2 days despite HA](./pi-zoro/docs/cnpg/README.md#-key-engineering-decisions) — the liveness probe only checked that the process was alive, not that it could actually read or write data, so it kept passing while the pod silently failed every query. Fixed with a Prometheus alert on extended pod-not-ready state; a follow-up manual failover test confirmed CNPG's own failover completes in under a minute once it gets a clear signal.
 
 ---
 
