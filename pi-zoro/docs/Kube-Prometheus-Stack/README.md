@@ -129,7 +129,7 @@ A single `PrometheusRule` (`homelab-alerts`, labelled `release: kube-prometheus-
 | `storage.critical` | `PVCUsageWarning` | any PVC, cluster-wide, > 60% for 10m | Early warning with runway to act |
 | `pods.critical` | `PodCrashLooping` | cluster-wide, > 5 restarts/hour for 5m | Catches kube-system and every app namespace, not just `monitoring` |
 | `pods.critical` | `PodOOMKilled` | `last_terminated_reason{reason="OOMKilled"}` `unless` currently running | The terminated-reason metric is sticky — the `unless` clause stops it firing forever once the pod has recovered |
-| `pods.critical` | `PodNotReadyExtended` | `kube_pod_status_ready{condition="false"} == 1` for 15m | Catches a pod stuck Running-but-not-Ready with 0 restarts — `PodCrashLooping` needs restarts, and the built-in `KubePodNotReady` only fires on phase Pending/Unknown, not Running. Added 2026-07-05 after `cnpg-cluster-2` sat at 0/1 for 2 days undetected |
+| `pods.critical` | `PodNotReadyExtended` | `kube_pod_status_ready{condition="false"} == 1` `and on` phase `Running` for 15m | Catches a pod stuck Running-but-not-Ready with 0 restarts — `PodCrashLooping` needs restarts, and the built-in `KubePodNotReady` only fires on phase Pending/Unknown, not Running. Added 2026-07-05 after `cnpg-cluster-2` sat at 0/1 for 2 days undetected |
 | `pods.critical` | `PrometheusTargetDown` | `up == 0` for 15m | 15m, not the usual 5m, to filter out restart/rolling-update flaps |
 | `flux.warning` | `FluxReconciliationFailed` | `gotk_reconcile_condition{type="Ready",status="False"} == 1` for 10m | A failed Flux reconciliation means Git changes are silently not applied |
 | `nodes.warning` | `NodeMemoryPressure` | available memory < 15% for 5m | Below this the OOM killer becomes likely |
@@ -140,6 +140,8 @@ A single `PrometheusRule` (`homelab-alerts`, labelled `release: kube-prometheus-
 `PVCUsageCritical`, `PVCUsageWarning`, and `PodCrashLooping` are deliberately cluster-wide rather than scoped to `namespace="monitoring"` — a full disk or crash loop in any app's namespace is just as dangerous, and a namespace filter would silently miss every other app.
 
 **`iSCSISessionLost` was removed 2026-07-05.** It was keyed off `node_iscsi_session_count`, a metric no exporter or textfile collector ever actually produced — the alert had been structurally incapable of firing since the day it was written. A 2026-07-02 iSCSI session drop on `luffy` corrupted linkding and the CNPG primary and went undetected for 2 days because of this and the `PodNotReadyExtended` gap above. Replaced with `PodNotReadyExtended`, which watches application health directly instead of a storage-layer signal this repo has no way to provision or track without adding an untracked node-level agent.
+
+**`PodNotReadyExtended` paged every ~15m the day after it was added.** Its original expression matched any pod with `Ready=false` for 15+ minutes, with no exclusion for pods that finish on purpose. Completed Job/CronJob pods (`renovate`, `@hourly`) stay `Ready=false, reason: PodCompleted` forever once done, so every leftover completed pod tripped the alert 15 minutes after it finished. Fixed by gating the expression on `kube_pod_status_phase{phase="Running"}` so only pods that are actually still running can match — the same class of fix as the `unless`-currently-running clause on `PodOOMKilled` above. See `session-notes/2026-07-05-renovate-alert-misfire.md`.
 
 ### Routing — Slack via Alertmanager
 
