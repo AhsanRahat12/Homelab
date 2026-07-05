@@ -127,9 +127,9 @@ A single `PrometheusRule` (`homelab-alerts`, labelled `release: kube-prometheus-
 | `storage.critical` | `PrometheusDataStaleness` | `time() - prometheus_tsdb_head_max_time_seconds > 300` for 5m | The exact failure mode from the May 2026 incident — Prometheus silently stops writing TSDB data (e.g. iSCSI goes read-only) |
 | `storage.critical` | `PVCUsageCritical` | any PVC, cluster-wide, > 80% for 5m | A full disk breaks the owning app, in any namespace |
 | `storage.critical` | `PVCUsageWarning` | any PVC, cluster-wide, > 60% for 10m | Early warning with runway to act |
-| `storage.critical` | `iSCSISessionLost` | `node_iscsi_session_count == 0` for 3m | Longer than the 120s automatic recovery window — fires only when recovery actually fails |
 | `pods.critical` | `PodCrashLooping` | cluster-wide, > 5 restarts/hour for 5m | Catches kube-system and every app namespace, not just `monitoring` |
 | `pods.critical` | `PodOOMKilled` | `last_terminated_reason{reason="OOMKilled"}` `unless` currently running | The terminated-reason metric is sticky — the `unless` clause stops it firing forever once the pod has recovered |
+| `pods.critical` | `PodNotReadyExtended` | `kube_pod_status_ready{condition="false"} == 1` for 15m | Catches a pod stuck Running-but-not-Ready with 0 restarts — `PodCrashLooping` needs restarts, and the built-in `KubePodNotReady` only fires on phase Pending/Unknown, not Running. Added 2026-07-05 after `cnpg-cluster-2` sat at 0/1 for 2 days undetected |
 | `pods.critical` | `PrometheusTargetDown` | `up == 0` for 15m | 15m, not the usual 5m, to filter out restart/rolling-update flaps |
 | `flux.warning` | `FluxReconciliationFailed` | `gotk_reconcile_condition{type="Ready",status="False"} == 1` for 10m | A failed Flux reconciliation means Git changes are silently not applied |
 | `nodes.warning` | `NodeMemoryPressure` | available memory < 15% for 5m | Below this the OOM killer becomes likely |
@@ -138,6 +138,8 @@ A single `PrometheusRule` (`homelab-alerts`, labelled `release: kube-prometheus-
 | `nodes.warning` | `NodeDiskPressure` | root filesystem > 80% for 5m | A full SD card means kubelet can't even write logs |
 
 `PVCUsageCritical`, `PVCUsageWarning`, and `PodCrashLooping` are deliberately cluster-wide rather than scoped to `namespace="monitoring"` — a full disk or crash loop in any app's namespace is just as dangerous, and a namespace filter would silently miss every other app.
+
+**`iSCSISessionLost` was removed 2026-07-05.** It was keyed off `node_iscsi_session_count`, a metric no exporter or textfile collector ever actually produced — the alert had been structurally incapable of firing since the day it was written. A 2026-07-02 iSCSI session drop on `luffy` corrupted linkding and the CNPG primary and went undetected for 2 days because of this and the `PodNotReadyExtended` gap above. Replaced with `PodNotReadyExtended`, which watches application health directly instead of a storage-layer signal this repo has no way to provision or track without adding an untracked node-level agent.
 
 ### Routing — Slack via Alertmanager
 

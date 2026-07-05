@@ -64,24 +64,17 @@ spec:
           annotations:
             summary: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} over 60% full — plan ahead"
 
-        # Detects a lost iSCSI session on either node in real time.
-        # This is your router restart scenario happening live.
-        # Why 3 minutes and not less: your iSCSI session recovery timeout is set
-        # to 120 seconds (Phase 0). If recovery is working, the session comes back
-        # within 2 minutes automatically. Alerting at 3 minutes means this only
-        # fires when recovery has actually failed — not on every router restart.
-        # If this fires, manual intervention is required immediately.
-        - alert: iSCSISessionLost
-          expr: node_iscsi_session_count == 0
-          for: 3m
-          labels:
-            severity: critical
-          annotations:
-            summary: "iSCSI session lost on {{ $labels.instance }}"
-            description: |
-              No active iSCSI sessions on {{ $labels.instance }}. PVC writes are failing.
-              Immediate action: kubectl delete pod prometheus-kube-prometheus-stack-prometheus-0 -n monitoring
-              Then check QNAP and iscsiadm -m session on the affected node.
+        # REMOVED 2026-07-05: iSCSISessionLost used to live here, keyed off
+        # node_iscsi_session_count. That metric was never actually implemented —
+        # no exporter or textfile collector anywhere ever produced it, so the
+        # alert was structurally incapable of firing since the day it was written.
+        # It sat here for weeks looking like coverage that didn't exist.
+        # A 2026-07-02 iSCSI session drop on luffy (see session-notes/) corrupted
+        # both linkding and the CNPG primary and went undetected for 2 days —
+        # this alert should have caught it and couldn't. Replaced by
+        # PodNotReadyExtended below, which watches the actual symptom (app
+        # health) instead of a storage-layer signal that requires an agent
+        # this repo has no way to provision or track.
 
     # -------------------------------------------------------------------------
     # PODS — Critical and Warning
@@ -123,6 +116,24 @@ spec:
           annotations:
             summary: "Pod {{ $labels.pod }} in {{ $labels.namespace }} was OOMKilled"
             description: "Container {{ $labels.container }} was killed due to out of memory. Check limits."
+
+        # Catches a pod that is Running but never becomes Ready — the exact
+        # shape of the 2026-07-02 incident. cnpg-cluster-2 sat at 0/1 for 2 full
+        # days with 0 restarts: phase stayed Running, so PodCrashLooping never
+        # tripped, and the built-in KubePodNotReady rule only fires on phase
+        # Pending/Unknown, not "Running but readiness failing." This is the gap
+        # between those two: any pod whose readiness condition is false for an
+        # extended period, regardless of restart count or phase. 15 minutes
+        # filters out normal slow startups (linkding alone has taken up to ~40s).
+        - alert: PodNotReadyExtended
+          expr: |
+            max by (namespace, pod) (kube_pod_status_ready{condition="false"}) == 1
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} in {{ $labels.namespace }} not Ready for 15+ minutes"
+            description: "Readiness has been false for over 15 minutes with no crash loop — check application logs and underlying storage, not just restart count."
 
         # Prometheus scrapes metrics from targets across the entire cluster.
         # If a target goes down its metrics stop updating, dashboards go stale,
