@@ -123,11 +123,16 @@ spec:
         # tripped, and the built-in KubePodNotReady rule only fires on phase
         # Pending/Unknown, not "Running but readiness failing." This is the gap
         # between those two: any pod whose readiness condition is false for an
-        # extended period, regardless of restart count or phase. 15 minutes
-        # filters out normal slow startups (linkding alone has taken up to ~40s).
+        # extended period. 15 minutes filters out normal slow startups (linkding
+        # alone has taken up to ~40s).
+        # The phase="Running" gate is required: Job/CronJob pods (e.g. renovate,
+        # @hourly) sit at Ready=false forever once they complete (reason
+        # PodCompleted), which paged every 15m for every leftover completed pod
+        # until this was added on 2026-07-05.
         - alert: PodNotReadyExtended
           expr: |
-            max by (namespace, pod) (kube_pod_status_ready{condition="false"}) == 1
+            (max by (namespace, pod) (kube_pod_status_ready{condition="false"}) == 1)
+            and on (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1)
           for: 15m
           labels:
             severity: critical
