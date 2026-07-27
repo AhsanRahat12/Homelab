@@ -26,7 +26,7 @@ spec:
 
       containers:
       - name: audiobookshelf
-        image: ghcr.io/advplyr/audiobookshelf:2.35.1
+        image: ghcr.io/advplyr/audiobookshelf:2.36.0
         ports:
         - containerPort: 3005
         envFrom:
