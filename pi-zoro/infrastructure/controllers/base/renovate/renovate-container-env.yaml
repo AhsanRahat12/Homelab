@@ -1,13 +1,12 @@
 apiVersion: v1
 data:
-    RENOVATE_TOKEN: ENC[AES256_GCM,data:on7W5dKwC46DjH1JHrgXDswW+fvWjtDlXGZxBKsq3ZpddtlT38akNL4ZzBI05wZP3aXyN8mAn5o=,iv:dOf8Dxlz1eShCsIJ27Lc8gHaj/cYOaxgFTb0TgiIr14=,tag:DmERkgJbTk453OovnKUPfQ==,type:str]
+    RENOVATE_TOKEN: ENC[AES256_GCM,data:D/UpZ3qyRd8WQPxhZ3rPL0LvrULlDM09XMJmeiBC3Re5WVEBOzsfeCArjeJ2zwwOArLdcSEiI9c=,iv:cNvGTsPKPU8g73jadfy5z752yQdg6nCdCb4+TQ8Wm5g=,tag:3Z7iFExjc5jK3LrhO+Km/A==,type:str]
 kind: Secret
 metadata:
     name: renovate-container-env
 sops:
     age:
-        - recipient: age1y5kcwc528w66sxjvfq4arpgtnrxmrjc2084mu54czmw2q0c3p3as4d4fpw
-          enc: |
+        - enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
             YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtTE44RkpTb0pxb0oyenpU
             ZXU5bEpuODdGSEdMclFLMjVNSjNBZ1dkOEI0CjIrV3BIZUU5cFhmaFBiWFg1ZS9K
@@ -15,7 +14,8 @@ sops:
             anN2L2Y5SUV0NmgyYVphenREM0NVcVUKGDylyevrnMYgMwZHj05sPWhmPpPpImT2
             NJyZdGoJnBOIACkFEaJpS3zYqkI7jm4CDHErTkIa1vPSHiZzaf03rg==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-05-09T01:53:44Z"
-    mac: ENC[AES256_GCM,data:plcrswp04FXMnZc/VUDpzLWZCQGnzgve9jFLkBBMBtgeQinEvX+eXxUpRC0WE8161OUSF8jSdYEQP2Iqp8dC6YYEb6Mzum6lbTrfH5THIZdba5HTiRMCE72B1CnIpnF2Z2KwXscDYILWgfD1ob3LrO/gLqPYSBgiljRLIuUW+0A=,iv:QGa/06zm6Q9q9j39/wfL82o17PRrpoCK9NGaZqjeJbY=,tag:neevTdDUP7J8WGjh5M1fGg==,type:str]
+          recipient: age1y5kcwc528w66sxjvfq4arpgtnrxmrjc2084mu54czmw2q0c3p3as4d4fpw
     encrypted_regex: ^(data|stringData)$
-    version: 3.12.2
+    lastmodified: "2026-08-13T02:34:00Z"
+    mac: ENC[AES256_GCM,data:yAlPWDU1JG8lqlivxz+CAVXtc05pB5hzZ9IS2Z6QF2IXBAfK/G3lstoheoP95iRFgRynesIevQIcNo4SLimIX6/dSEueC5sAspw9zxafaSOCEi6PiYCbr6v5Wg7uHONaFDHOxqINkdT3jOXLgMkALwxLtcum18pe4V4IuV3FqgQ=,iv:llF0VZOC5cdTDujaGdSi/KSWOQg/ZBqfbu3TgDCNw3g=,tag:d0tWheVslYHGl1eJFr1VmQ==,type:str]
+    version: 3.13.3
