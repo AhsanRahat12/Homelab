@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: linkding
-          image: sissbruecker/linkding:1.46.2
+          image: sissbruecker/linkding:1.47.0
           envFrom:
             - secretRef:
                 name: linkding-container-env
